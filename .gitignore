@@ -1,0 +1,22 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build
+build/
+out/
+.gradle/
+
+# 运行时数据（部署目录约定：data/ 存 SQLite，logs/ 存日志）
+data/
+logs/
+*.db
+
+# 本地环境与密钥
+.env
+*.local.yaml
+
+# OS
+Thumbs.db
+.DS_Store
