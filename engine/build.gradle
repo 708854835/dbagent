@@ -22,3 +22,35 @@ jar {
 }
 
 // 演示入口：java -jar engine/build/libs/engine.jar generate --input form.json --output result.json
+
+// 部署包：dbagent-engine.zip（bin/ 启动脚本 + config/ 规则与字典 + lib/ fat jar + data/ + logs/）
+tasks.register('distZip', Zip) {
+    dependsOn jar
+    archiveBaseName = 'dbagent-engine'
+    archiveVersion = ''
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    includeEmptyDirs = true
+    into('dbagent-engine') {
+        into('bin') {
+            from('src/dist/bin') {
+                include 'start.sh'
+                filePermissions { unix('rwxr-xr-x') }
+            }
+            from('src/dist/bin') {
+                include 'start.bat'
+            }
+        }
+        into('config') {
+            from('../config')
+        }
+        into('lib') {
+            from(jar)
+        }
+        into('data') {
+            from('src/dist/data')
+        }
+        into('logs') {
+            from('src/dist/logs')
+        }
+    }
+}

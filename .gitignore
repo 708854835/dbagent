@@ -14,6 +14,9 @@ result*.json
 # 运行时数据（部署目录约定：data/ 存 SQLite，logs/ 存日志）
 data/
 logs/
+# 部署包骨架占位目录例外
+!engine/src/dist/data/
+!engine/src/dist/logs/
 *.db
 
 # 本地环境与密钥
