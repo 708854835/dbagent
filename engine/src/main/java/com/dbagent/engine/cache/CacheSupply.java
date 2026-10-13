@@ -19,8 +19,26 @@ public interface CacheSupply {
     /** 字典快照：按中文名查字典项（公共集/自治级）。 */
     List<DictItem> findDictItems(String chineseName);
 
+    /**
+     * 已确认候选：用户复核通过（LLM 候选/手工修改）的定义，按归属系统+中文名落库。
+     * 返回项须由决策链按上下文指纹过滤（指纹不一致表示表单上下文已变，不采用）；
+     * 字典快照更新后旧候选由供给方过滤（失效不再返回）。默认空（无确认缓存场景）。
+     */
+    default List<ConfirmedCandidate> findConfirmed(String owningSystem, String chineseName) {
+        return List.of();
+    }
+
     /** 存量字段定义（英文名 + 物理类型照抄，见 ADR-0001）。 */
     record CachedField(String chineseName, String englishName, String physicalType) {
+    }
+
+    /**
+     * 已确认候选定义：英文名/数据类型/物理类型照抄用户确认结果；
+     * contextFingerprint 为确认时的表单上下文指纹（归属系统+表中文名+字段中文名集合）。
+     */
+    record ConfirmedCandidate(String chineseName, String englishName, String dataType,
+                              String physicalType, List<Code> codeList,
+                              String contextFingerprint) {
     }
 
     /**

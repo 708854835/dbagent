@@ -31,6 +31,8 @@ public class GenerationResult {
         public List<com.dbagent.engine.cache.CacheSupply.Code> codeList;
         /** 复用多命中定义不一致时的全量候选（供用户选择） */
         public List<com.dbagent.engine.cache.CacheSupply.CachedField> candidates;
+        /** 锁定字段（增量重生成输入携带 locked=true）：true 时输出，供下次重生成回传 */
+        public Boolean locked;
     }
 
     /** 待登记字段清单项：字典项编号留空不虚构，由数据管理员登记时生成。 */

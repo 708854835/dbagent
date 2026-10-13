@@ -1,6 +1,7 @@
 package com.dbagent.engine.gen;
 
 import com.dbagent.engine.cache.CacheSupply;
+import com.dbagent.engine.cache.ConfirmedService;
 import com.dbagent.engine.ddl.DdlBuilder;
 import com.dbagent.engine.decision.Badge;
 import com.dbagent.engine.decision.DecisionChain;
@@ -13,15 +14,22 @@ import com.dbagent.engine.rules.EngineConfig;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
- * 生成服务缝（主缝）：表单 JSON 进 → 生成结果（DDL/徽章/待登记清单/索引建议占位）出。
- * CLI/HTTP 均为薄壳，直调此缝。
+ * 生成服务缝（主缝）：表单 JSON 进 → 生成结果（DDL/徽章/待登记清单/索引建议）出。
+ * CLI/HTTP 均为薄壳，直调此缝。锁定字段（增量重生成）照抄不重算；
+ * 同表英文名撞名不自动改名，标"需人工复核"。
  */
 public final class GenerationService {
+
+    /** 启发式索引候选列上限（主键索引除外） */
+    private static final int INDEX_CANDIDATE_MAX = 5;
 
     private final EngineConfig config;
     private final DecisionChain decisionChain;
@@ -40,11 +48,18 @@ public final class GenerationService {
         // 表名推导：t_ 前缀 + 表名专用缩写词典
         result.tableName = deriveTableName(form.tableChineseName.trim(), warnings, result);
 
-        // 字段三级决策
+        // 字段决策：锁定字段照抄不重算（增量重生成），其余走决策链（确认缓存级按指纹判定）
+        String fingerprint = ConfirmedService.fingerprintOf(form);
         List<FieldDecision> decisions = new ArrayList<>();
         for (FormField f : form.fields) {
-            decisions.add(decisionChain.decide(f, form.owningSystem));
+            if (f.isLocked()) {
+                decisions.add(lockedDecision(f));
+            } else {
+                decisions.add(decisionChain.decide(f, form.owningSystem, fingerprint));
+            }
         }
+        // 同表英文名撞名检测：不自动改名，非锁定字段标"需人工复核"
+        markNameCollisions(form, decisions, result.warnings);
         for (FieldDecision d : decisions) {
             if (!d.isUsable()) {
                 warnings.add("字段「" + d.chineseName() + "」需人工复核: " + d.note()
@@ -124,8 +139,9 @@ public final class GenerationService {
         result.ddl = new DdlBuilder().build(result.tableName, tableComment, columns,
                 pkColumns, config.constraints().engine, config.constraints().charset);
 
-        // 逐字段视图 + 待登记清单 + 索引建议占位
-        for (FieldDecision d : decisions) {
+        // 逐字段视图 + 待登记清单 + 索引建议
+        for (int i = 0; i < decisions.size(); i++) {
+            FieldDecision d = decisions.get(i);
             GenerationResult.FieldView view = new GenerationResult.FieldView();
             view.chineseName = d.chineseName();
             view.englishName = d.englishName();
@@ -135,6 +151,7 @@ public final class GenerationService {
             view.note = d.note();
             view.codeList = d.codeList();
             view.candidates = d.candidates();
+            view.locked = form.fields.get(i).isLocked() ? Boolean.TRUE : null;
             result.fields.add(view);
 
             if (d.badge() == Badge.DERIVED) {
@@ -154,8 +171,94 @@ public final class GenerationService {
         pkIndex.columns = List.copyOf(pkColumns);
         pkIndex.fixed = true;
         result.indexSuggestions.add(pkIndex);
+        addHeuristicIndexSuggestions(decisions, pkColumns, result);
 
         return result;
+    }
+
+    /** 锁定字段照抄：englishName/physicalType 必填校验 + 命名规则校验（不通过则复核）。 */
+    private FieldDecision lockedDecision(FormField f) {
+        String chineseName = f.chineseName.trim();
+        if (f.englishName == null || f.englishName.isBlank()
+                || f.physicalType == null || f.physicalType.isBlank()) {
+            throw new GenerationException("VALIDATION_FAILED",
+                    "锁定字段「" + chineseName + "」缺少英文名或物理类型（阻断级）");
+        }
+        String name = f.englishName.trim().toLowerCase(Locale.ROOT);
+        if (name.length() > config.naming().field.maxChars
+                || config.naming().field.reservedWords.contains(name)
+                || !java.util.regex.Pattern.matches(config.naming().field.pattern, name)) {
+            return FieldDecision.needsReview(chineseName, "锁定英文名不合规: " + name);
+        }
+        return FieldDecision.locked(chineseName, name, f.dataType, f.physicalType.trim());
+    }
+
+    /**
+     * 同表英文名撞名检测：不同中文名决策出相同英文名（贯标同源/推导撞名）→
+     * 不自动改名，非锁定字段全部标"需人工复核"；锁定字段不动，仅撞它的非锁定字段复核。
+     */
+    private void markNameCollisions(FormInput form, List<FieldDecision> decisions,
+                                    List<String> warnings) {
+        Map<String, List<Integer>> byName = new LinkedHashMap<>();
+        for (int i = 0; i < decisions.size(); i++) {
+            FieldDecision d = decisions.get(i);
+            if (d.isUsable()) {
+                byName.computeIfAbsent(d.englishName(), k -> new ArrayList<>()).add(i);
+            }
+        }
+        for (Map.Entry<String, List<Integer>> e : byName.entrySet()) {
+            List<Integer> group = e.getValue();
+            if (group.size() < 2) {
+                continue;
+            }
+            List<Integer> lockedIdx = group.stream()
+                    .filter(i -> form.fields.get(i).isLocked()).toList();
+            String chineseNames = group.stream()
+                    .map(i -> decisions.get(i).chineseName())
+                    .reduce((a, b) -> a + "/" + b).orElse("");
+            for (int i : group) {
+                if (lockedIdx.contains(i)) {
+                    continue;
+                }
+                String reason = lockedIdx.isEmpty()
+                        ? "同表英文名撞名（" + chineseNames + "）: " + e.getKey() + "，不自动改名"
+                        : "与锁定字段英文名撞名: " + e.getKey() + "，不自动改名";
+                decisions.set(i, FieldDecision.needsReview(decisions.get(i).chineseName(), reason));
+            }
+            if (lockedIdx.size() > 1) {
+                warnings.add("锁定字段间英文名撞名（" + chineseNames + "）: " + e.getKey()
+                        + "，锁定字段未改动，请人工确认");
+            }
+        }
+    }
+
+    /**
+     * 启发式索引候选列：编码类/代码类/关联列（_no 结尾），新表无数据不按选择性计算，
+     * 主键列除外，数量 ≤5。
+     */
+    private void addHeuristicIndexSuggestions(List<FieldDecision> decisions,
+                                              List<String> pkColumns, GenerationResult result) {
+        Set<String> pk = new LinkedHashSet<>(pkColumns);
+        int added = 0;
+        for (FieldDecision d : decisions) {
+            if (added >= INDEX_CANDIDATE_MAX) {
+                break;
+            }
+            if (!d.isUsable() || pk.contains(d.englishName())) {
+                continue;
+            }
+            boolean candidate = "编码类".equals(d.dataType()) || "代码类".equals(d.dataType())
+                    || d.englishName().endsWith("_no");
+            if (!candidate) {
+                continue;
+            }
+            GenerationResult.IndexSuggestion idx = new GenerationResult.IndexSuggestion();
+            idx.name = "idx_" + d.englishName();
+            idx.columns = List.of(d.englishName());
+            idx.fixed = false;
+            result.indexSuggestions.add(idx);
+            added++;
+        }
     }
 
     private String deriveTableName(String tableChineseName, List<String> warnings,

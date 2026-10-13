@@ -42,6 +42,14 @@ public final class DecisionChain {
      * @param owningSystem 本系统标识（复用缓存按系统隔离）；为空时跳过复用级
      */
     public FieldDecision decide(FormField field, String owningSystem) {
+        return decide(field, owningSystem, null);
+    }
+
+    /**
+     * @param owningSystem       本系统标识（复用缓存按系统隔离）；为空时跳过复用级
+     * @param contextFingerprint 表单上下文指纹（确认缓存级判定用）；为 null 时跳过确认缓存级
+     */
+    public FieldDecision decide(FormField field, String owningSystem, String contextFingerprint) {
         String chineseName = field.chineseName.trim();
 
         // ① 本系统复用：录入中文名与存量字段 COMMENT 中文名精确匹配（忽略首尾空白，不做分词）
@@ -61,6 +69,19 @@ public final class DecisionChain {
             return FieldDecision.needsReview(chineseName,
                     "复用命中 " + distinct.size() + " 个定义不一致的存量字段，请人工选择",
                     List.copyOf(distinct.values()));
+        }
+
+        // ①.⑤ 已确认候选：用户复核通过的定义，同上下文指纹直接复用（不再走 LLM）；
+        // 字典快照已更新的候选由供给方过滤，不会到达这里
+        if (contextFingerprint != null) {
+            for (CacheSupply.ConfirmedCandidate c
+                    : cacheSupply.findConfirmed(owningSystem, chineseName)) {
+                if (contextFingerprint.equals(c.contextFingerprint())) {
+                    return FieldDecision.confirmed(chineseName,
+                            c.englishName().toLowerCase(Locale.ROOT), c.dataType(),
+                            c.physicalType(), c.codeList());
+                }
+            }
         }
 
         // ② 字典贯标：公共集优先于自治级；存量公共集兼容采用（选词结构照抄，输出统一小写）

@@ -34,6 +34,16 @@ public final class DictStore {
             )
             """;
 
+    static final String META_DDL = """
+            CREATE TABLE IF NOT EXISTS meta (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL
+            )
+            """;
+
+    /** 字典快照标记（meta 表 key）：已确认候选按此标记判定失效。 */
+    public static final String SNAPSHOT_KEY = "dict_snapshot";
+
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private final Path dbPath;
@@ -42,7 +52,7 @@ public final class DictStore {
         this.dbPath = dbPath;
     }
 
-    /** 整体替换：清空字典表重灌（单事务）。 */
+    /** 整体替换：清空字典表重灌（单事务），并刷新快照标记（内容哈希）。 */
     public void replaceAll(Collection<CacheSupply.DictItem> items) {
         try (Connection conn = connect()) {
             conn.setAutoCommit(false);
@@ -67,9 +77,58 @@ public final class DictStore {
                 }
                 ps.executeBatch();
             }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO meta (key, value) VALUES (?, ?)"
+                            + " ON CONFLICT(key) DO UPDATE SET value = excluded.value")) {
+                ps.setString(1, SNAPSHOT_KEY);
+                ps.setString(2, computeSnapshot(items));
+                ps.executeUpdate();
+            }
             conn.commit();
         } catch (SQLException e) {
             throw new IllegalStateException("字典快照导入失败: " + dbPath, e);
+        }
+    }
+
+    /** 当前字典快照标记（内容哈希）；从未导入时返回空串。 */
+    public String currentSnapshot() {
+        try (Connection conn = connect();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT value FROM meta WHERE key = ?")) {
+            ps.setString(1, SNAPSHOT_KEY);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : "";
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("字典快照标记查询失败: " + dbPath, e);
+        }
+    }
+
+    /** 快照标记 = 全部条目关键内容的 SHA-256（内容不变则标记不变，确认缓存不失效）。 */
+    private static String computeSnapshot(Collection<CacheSupply.DictItem> items) {
+        String canonical = items.stream()
+                .map(i -> String.join("|", i.id(), i.chineseName(), i.englishName(),
+                        i.importance(), i.dataType(),
+                        i.dataFormat() == null ? "" : i.dataFormat(),
+                        codeListJson(i.codeList()) == null ? "" : codeListJson(i.codeList())))
+                .sorted()
+                .reduce("", (a, b) -> a + "\u0001" + b);
+        return sha256Hex(canonical);
+    }
+
+    /** SHA-256 十六进制（快照标记与上下文指纹共用）。 */
+    public static String sha256Hex(String text) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(Character.forDigit((b >> 4) & 0xF, 16))
+                        .append(Character.forDigit(b & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
         }
     }
 

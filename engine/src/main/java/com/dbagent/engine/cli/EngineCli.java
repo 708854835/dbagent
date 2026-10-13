@@ -1,12 +1,15 @@
 package com.dbagent.engine.cli;
 
+import com.dbagent.engine.cache.ConfirmedService;
 import com.dbagent.engine.cache.SqliteCacheSupply;
 import com.dbagent.engine.db.CacheStore;
+import com.dbagent.engine.db.ConfirmedStore;
 import com.dbagent.engine.db.DictStore;
 import com.dbagent.engine.db.EngineDatabase;
 import com.dbagent.engine.db.SchemaCacheRefresher;
 import com.dbagent.engine.dict.DictImportReport;
 import com.dbagent.engine.dict.DictImporter;
+import com.dbagent.engine.form.ConfirmInput;
 import com.dbagent.engine.form.FormInput;
 import com.dbagent.engine.gen.GenerationException;
 import com.dbagent.engine.gen.GenerationResult;
@@ -59,6 +62,7 @@ public final class EngineCli {
 
         switch (args[0]) {
             case "generate" -> runGenerate(opts, configDir, dataDir);
+            case "confirm" -> runConfirm(opts, configDir, dataDir);
             case "refresh-schema" -> runRefreshSchema(opts, dataDir);
             case "serve" -> runServe(configDir, dataDir);
             default -> {
@@ -87,7 +91,8 @@ public final class EngineCli {
             }
             FormInput form = JSON.readValue(input.toFile(), FormInput.class);
             GenerationResult result = new GenerationService(
-                    config, new SqliteCacheSupply(dictStore, new CacheStore(db))).generate(form);
+                    config, new SqliteCacheSupply(dictStore, new CacheStore(db),
+                            new ConfirmedStore(db))).generate(form);
             JSON.writeValue(output.toFile(), result);
             System.out.println("生成成功: 表 " + result.tableName + "，字段 " + result.fields.size()
                     + " 个，待登记 " + result.pendingRegistration.size() + " 项 → " + output);
@@ -97,6 +102,26 @@ public final class EngineCli {
             System.exit(1);
         } catch (Exception e) {
             writeError(output, "ENGINE_ERROR", e.getMessage());
+            System.err.println("引擎错误: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private static void runConfirm(Map<String, String> opts, Path configDir, Path dataDir) {
+        Path input = Path.of(required(opts, "--input"));
+        try {
+            EngineConfig config = RulesLoader.load(configDir);
+            Path db = EngineDatabase.initialize(dataDir);
+            DictStore dictStore = new DictStore(db);
+            ConfirmInput confirmInput = JSON.readValue(input.toFile(), ConfirmInput.class);
+            int count = new ConfirmedService(config, new ConfirmedStore(db), dictStore)
+                    .confirm(confirmInput);
+            System.out.println("已确认候选登记完成: 系统 " + confirmInput.owningSystem + "，共 "
+                    + count + " 个字段（同上下文下次生成直接复用）");
+        } catch (GenerationException e) {
+            System.err.println("登记失败 [" + e.code() + "] " + e.getMessage());
+            System.exit(1);
+        } catch (Exception e) {
             System.err.println("引擎错误: " + e.getMessage());
             System.exit(1);
         }
@@ -134,10 +159,12 @@ public final class EngineCli {
                 System.exit(1);
             }
             CacheStore cacheStore = new CacheStore(db);
+            ConfirmedStore confirmedStore = new ConfirmedStore(db);
             HttpServer server = new EngineHttp(settings, config,
-                    new SqliteCacheSupply(dictStore, cacheStore), cacheStore).start();
+                    new SqliteCacheSupply(dictStore, cacheStore, confirmedStore), cacheStore,
+                    confirmedStore, dictStore).start();
             System.out.println("引擎 HTTP 服务已启动: http://localhost:" + server.getAddress().getPort()
-                    + "（POST /generate, POST /schema-cache/refresh）");
+                    + "（POST /generate, /confirm, /schema-cache/refresh）");
             Thread.currentThread().join();
         } catch (Exception e) {
             System.err.println("服务启动失败: " + e.getMessage());
@@ -179,6 +206,7 @@ public final class EngineCli {
         System.err.println("""
                 用法:
                   java -jar engine.jar generate --input form.json --output result.json [--config config] [--data data]
+                  java -jar engine.jar confirm --input confirm.json [--config config] [--data data]
                   java -jar engine.jar serve [--config config] [--data data]
                   java -jar engine.jar refresh-schema --system 系统标识 --jdbc jdbc:mysql://host:3306/db --user 账号 [--password 口令]
                 """);

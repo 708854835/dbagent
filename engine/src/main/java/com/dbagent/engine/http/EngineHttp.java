@@ -1,8 +1,12 @@
 package com.dbagent.engine.http;
 
 import com.dbagent.engine.cache.CacheSupply;
+import com.dbagent.engine.cache.ConfirmedService;
 import com.dbagent.engine.db.CacheStore;
+import com.dbagent.engine.db.ConfirmedStore;
+import com.dbagent.engine.db.DictStore;
 import com.dbagent.engine.db.SchemaCacheRefresher;
+import com.dbagent.engine.form.ConfirmInput;
 import com.dbagent.engine.form.FormInput;
 import com.dbagent.engine.gen.GenerationException;
 import com.dbagent.engine.gen.GenerationService;
@@ -23,6 +27,7 @@ import java.util.Map;
 /**
  * 引擎 HTTP 服务（9090）：IDEA 插件入口。
  * POST /generate              建表向导生成（Token 校验后注入 user 上下文）
+ * POST /confirm               已确认候选登记（复核通过的定义回传落库）
  * POST /schema-cache/refresh  本系统 Schema 缓存拉取（information_schema 全量含视图）
  * CLI 无 Token 场景继续可用（不经 HTTP）。
  */
@@ -34,18 +39,29 @@ public final class EngineHttp {
     private final EngineConfig rules;
     private final CacheSupply cacheSupply;
     private final CacheStore cacheStore;
+    private final ConfirmedStore confirmedStore;
+    private final DictStore dictStore;
 
     public EngineHttp(EngineSettings settings, EngineConfig rules,
                       CacheSupply cacheSupply, CacheStore cacheStore) {
+        this(settings, rules, cacheSupply, cacheStore, null, null);
+    }
+
+    public EngineHttp(EngineSettings settings, EngineConfig rules,
+                      CacheSupply cacheSupply, CacheStore cacheStore,
+                      ConfirmedStore confirmedStore, DictStore dictStore) {
         this.settings = settings;
         this.rules = rules;
         this.cacheSupply = cacheSupply;
         this.cacheStore = cacheStore;
+        this.confirmedStore = confirmedStore;
+        this.dictStore = dictStore;
     }
 
     public HttpServer start() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(settings.http.port), 0);
         server.createContext("/generate", this::handleGenerate);
+        server.createContext("/confirm", this::handleConfirm);
         server.createContext("/schema-cache/refresh", this::handleRefresh);
         server.start();
         return server;
@@ -63,6 +79,30 @@ public final class EngineHttp {
             form.owningSystem = user.owningSystem();
             Object result = new GenerationService(rules, cacheSupply).generate(form);
             respond(exchange, 200, result);
+        } catch (GenerationException e) {
+            respond(exchange, 422, errorBody(e.code(), e.getMessage()));
+        } catch (Exception e) {
+            respond(exchange, 400, errorBody("BAD_REQUEST", e.getMessage()));
+        }
+    }
+
+    private void handleConfirm(HttpExchange exchange) throws IOException {
+        EngineSettings.UserContext user = requireAuth(exchange);
+        if (user == null) {
+            return;
+        }
+        if (confirmedStore == null || dictStore == null) {
+            respond(exchange, 503, errorBody("UNAVAILABLE", "确认缓存未接入"));
+            return;
+        }
+        try {
+            ConfirmInput input = JSON.readValue(readBody(exchange), ConfirmInput.class);
+            // Token 登录态校验后注入 user 上下文（覆盖表单内的自称身份）
+            input.owningSystem = user.owningSystem();
+            int count = new ConfirmedService(rules, confirmedStore, dictStore).confirm(input);
+            Map<String, Object> ok = new LinkedHashMap<>();
+            ok.put("confirmed", count);
+            respond(exchange, 200, ok);
         } catch (GenerationException e) {
             respond(exchange, 422, errorBody(e.code(), e.getMessage()));
         } catch (Exception e) {

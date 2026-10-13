@@ -26,6 +26,20 @@ public record FieldDecision(
                 Badge.REUSE, null, null, null, null);
     }
 
+    /** 已确认候选复用：用户复核通过的定义照抄（同上下文指纹 + 字典快照一致）。 */
+    public static FieldDecision confirmed(String chineseName, String englishName, String dataType,
+                                          String physicalType, List<CacheSupply.Code> codeList) {
+        return new FieldDecision(chineseName, englishName, dataType, physicalType,
+                Badge.REUSE, "已确认候选复用（上下文一致，未走 LLM）", codeList, null, null);
+    }
+
+    /** 用户锁定字段：增量重生成时照抄表单携带定义，不重算。 */
+    public static FieldDecision locked(String chineseName, String englishName, String dataType,
+                                       String physicalType) {
+        return new FieldDecision(chineseName, englishName, dataType, physicalType,
+                Badge.REUSE, "用户锁定字段（增量重生成未重算）", null, null, null);
+    }
+
     public static FieldDecision standardized(String chineseName, String englishName, String dataType,
                                              String physicalType, List<CacheSupply.Code> codeList,
                                              String commentSuffix) {

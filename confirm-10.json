@@ -1,0 +1,16 @@
+{
+  "tableChineseName": "同业借款合同台账",
+  "owningSystem": "loan-system",
+  "fieldNames": [
+    "客户编号", "币种", "客户名称", "机构编号", "借款金额",
+    "合同编号", "借款银行名称", "借款日期", "还款日期", "特殊目的载体"
+  ],
+  "confirmed": [
+    {
+      "chineseName": "客户编号",
+      "englishName": "cust_no",
+      "dataType": "编码类",
+      "physicalType": "VARCHAR(20)"
+    }
+  ]
+}

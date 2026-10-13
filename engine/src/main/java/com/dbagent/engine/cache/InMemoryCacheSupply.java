@@ -13,6 +13,7 @@ public final class InMemoryCacheSupply implements CacheSupply {
 
     private final Map<String, List<CachedField>> schemaFields = new HashMap<>();
     private final Map<String, List<DictItem>> dictItems = new HashMap<>();
+    private final Map<String, List<ConfirmedCandidate>> confirmed = new HashMap<>();
 
     public InMemoryCacheSupply putSchemaField(String owningSystem, CachedField field) {
         schemaFields.computeIfAbsent(key(owningSystem, field.chineseName()),
@@ -22,6 +23,12 @@ public final class InMemoryCacheSupply implements CacheSupply {
 
     public InMemoryCacheSupply putDictItem(DictItem item) {
         dictItems.computeIfAbsent(item.chineseName(), k -> new ArrayList<>()).add(item);
+        return this;
+    }
+
+    public InMemoryCacheSupply putConfirmed(String owningSystem, ConfirmedCandidate candidate) {
+        confirmed.computeIfAbsent(key(owningSystem, candidate.chineseName()),
+                k -> new ArrayList<>()).add(candidate);
         return this;
     }
 
@@ -36,6 +43,14 @@ public final class InMemoryCacheSupply implements CacheSupply {
     @Override
     public List<DictItem> findDictItems(String chineseName) {
         return dictItems.getOrDefault(chineseName, List.of());
+    }
+
+    @Override
+    public List<ConfirmedCandidate> findConfirmed(String owningSystem, String chineseName) {
+        if (owningSystem == null || owningSystem.isBlank()) {
+            return List.of();
+        }
+        return confirmed.getOrDefault(key(owningSystem, chineseName), List.of());
     }
 
     private static String key(String owningSystem, String chineseName) {

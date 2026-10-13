@@ -1,0 +1,18 @@
+{
+  "tableChineseName": "同业借款合同台账",
+  "description": "规则引擎完备化演示：复用/贯标/推导三类来源 + 索引建议",
+  "notesId": "zhangsan",
+  "owningSystem": "loan-system",
+  "fields": [
+    { "chineseName": "客户编号", "required": true },
+    { "chineseName": "币种", "required": true },
+    { "chineseName": "客户名称", "required": true, "length": 128 },
+    { "chineseName": "机构编号", "required": true },
+    { "chineseName": "借款金额", "required": true },
+    { "chineseName": "合同编号", "required": true, "length": 32 },
+    { "chineseName": "借款银行名称", "length": 128 },
+    { "chineseName": "借款日期" },
+    { "chineseName": "还款日期" },
+    { "chineseName": "特殊目的载体", "length": 64 }
+  ]
+}
