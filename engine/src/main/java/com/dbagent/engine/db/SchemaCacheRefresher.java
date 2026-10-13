@@ -6,7 +6,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 本系统 Schema 缓存拉取：IDEA 配置 MySQL 数据源（URL/账号/口令），
@@ -27,23 +29,30 @@ public final class SchemaCacheRefresher {
     private SchemaCacheRefresher() {
     }
 
+    /** 拉取统计：表数（distinct 表名）与字段行数。 */
+    public record RefreshStats(int tables, int fields) {
+    }
+
     /**
      * 拉取并整体替换该系统的缓存。
      *
-     * @return 拉取到的字段行数
+     * @return 拉取统计（表数 / 字段行数）
      */
-    public static int refresh(String jdbcUrl, String username, String password,
-                              String owningSystem, CacheStore store) {
+    public static RefreshStats refresh(String jdbcUrl, String username, String password,
+                                       String owningSystem, CacheStore store) {
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             conn.setReadOnly(true);
             String schema = conn.getCatalog();
             List<CacheStore.Row> rows = new ArrayList<>();
+            Set<String> tables = new HashSet<>();
             try (PreparedStatement ps = conn.prepareStatement(PULL_SQL)) {
                 ps.setString(1, schema);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
+                        String tableName = rs.getString("TABLE_NAME");
+                        tables.add(tableName);
                         rows.add(new CacheStore.Row(
-                                rs.getString("TABLE_NAME"),
+                                tableName,
                                 rs.getString("COLUMN_NAME"),
                                 rs.getString("COLUMN_TYPE"),
                                 rs.getString("COLUMN_COMMENT") == null
@@ -52,7 +61,7 @@ public final class SchemaCacheRefresher {
                 }
             }
             store.replaceSystem(owningSystem, rows);
-            return rows.size();
+            return new RefreshStats(tables.size(), rows.size());
         } catch (SQLException e) {
             throw new IllegalStateException(
                     "Schema 缓存拉取失败: " + jdbcUrl + " (system=" + owningSystem + ")", e);

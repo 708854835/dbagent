@@ -14,8 +14,10 @@ import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 引擎配置（config/engine.yaml，非规则配置）：HTTP 监听、日志目录、Token 清单。
@@ -35,6 +37,8 @@ public class EngineSettings {
     public Http http = new Http();
     public Logs logs = new Logs();
     public List<TokenEntry> tokens = new ArrayList<>();
+    /** 归属系统 → 数据源连接（refresh-schema 空参回退，插件端零 JDBC 配置） */
+    public Map<String, DataSource> datasources = new HashMap<>();
 
     public static class Http {
         public int port = 9090;
@@ -45,6 +49,13 @@ public class EngineSettings {
     public static class Logs {
         /** 日志目录：审计日志 audit.log 与运行日志 engine.log 分离 */
         public String dir = "logs";
+    }
+
+    /** 数据源连接：refresh-schema 请求未带 jdbcUrl 时按归属系统回退使用。 */
+    public static class DataSource {
+        public String jdbcUrl;
+        public String username;
+        public String password;
     }
 
     /** Token 条目：opaque 值（明文或 hmac:hex）+ 绑定的 NotesID 与归属系统 + 签发日期。 */

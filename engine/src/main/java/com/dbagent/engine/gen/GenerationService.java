@@ -362,6 +362,18 @@ public final class GenerationService {
 
     private String deriveTableName(FormInput form, List<String> warnings,
                                    GenerationResult result) {
+        // 锁定表名：用户已确认/已手工修改，照抄不重算（仅做合法性校验）
+        if (form.lockedTableName != null && !form.lockedTableName.isBlank()) {
+            String locked = form.lockedTableName.trim();
+            String prefix = config.naming().table.prefix;
+            String body = locked.startsWith(prefix) ? locked.substring(prefix.length()) : locked;
+            String invalid = validateTableNameBody(body);
+            if (invalid != null) {
+                throw new GenerationException("VALIDATION_FAILED",
+                        "锁定表名「" + locked + "」" + invalid);
+            }
+            return prefix + body;
+        }
         String tableChineseName = form.tableChineseName.trim();
         AbbreviationDictionary.Derivation derivation = config.tableAbbrev().derive(tableChineseName);
         if (!derivation.fullyCovered()) {

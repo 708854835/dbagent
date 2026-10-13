@@ -13,5 +13,7 @@ public class FormInput {
     public String description;
     public String notesId;
     public String owningSystem;
+    /** 锁定表名：用户已确认/已手工修改的物理表名，增量重生成时照抄不重算 */
+    public String lockedTableName;
     public List<FormField> fields = new ArrayList<>();
 }

@@ -232,6 +232,38 @@ class EngineHttpTest {
 
     @Test
     void refreshMissingParamsReturns400() throws Exception {
+        // 空参且引擎未配置该系统存储数据源 → 400
+        HttpResponse<String> r = post("/refresh-schema", VALID, "{}");
+        assertEquals(400, r.statusCode());
+        JsonNode body = JSON.readTree(r.body());
+        assertEquals("VALIDATION_FAILED", body.path("code").asText());
+        assertTrue(body.path("message").asText().contains("存储数据源"), r.body());
+    }
+
+    @Test
+    void refreshEmptyParamsFallsBackToStoredDatasource() throws Exception {
+        // 插件端零 JDBC 配置：空参回退引擎侧存储数据源（此处不可达 → 500 通用提示）
+        EngineSettings.DataSource ds = new EngineSettings.DataSource();
+        ds.jdbcUrl = "jdbc:mysql://127.0.0.1:1/hidden_db";
+        ds.username = "stored_user";
+        ds.password = "stored_secret";
+        settings.datasources.put("DEMO", ds);
+        HttpResponse<String> r = post("/refresh-schema", VALID, "{}");
+        assertEquals(500, r.statusCode());
+        JsonNode body = JSON.readTree(r.body());
+        assertEquals("ENGINE_ERROR", body.path("code").asText());
+        // 存储连接参数不外泄
+        assertFalse(r.body().contains("stored_secret"), r.body());
+        assertFalse(r.body().contains("hidden_db"), r.body());
+    }
+
+    @Test
+    void refreshStoredDatasourceNotConfiguredForOtherSystemReturns400() throws Exception {
+        // 仅配置 OTHER 系统数据源：DEMO 系统空参仍 400
+        EngineSettings.DataSource ds = new EngineSettings.DataSource();
+        ds.jdbcUrl = "jdbc:mysql://127.0.0.1:1/other_db";
+        ds.username = "u";
+        settings.datasources.put("OTHER", ds);
         HttpResponse<String> r = post("/refresh-schema", VALID, "{}");
         assertEquals(400, r.statusCode());
         assertEquals("VALIDATION_FAILED", JSON.readTree(r.body()).path("code").asText());

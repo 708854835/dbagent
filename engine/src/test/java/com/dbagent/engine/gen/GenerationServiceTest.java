@@ -124,6 +124,28 @@ class GenerationServiceTest {
         assertFalse(r.ddl.contains("AUTO_INCREMENT"), r.ddl);
     }
 
+    @Test
+    void lockedTableNameIsCopiedWithoutDerivation() {
+        FormInput form = demoForm();
+        form.lockedTableName = "t_mytable";
+
+        GenerationResult r = service.generate(form);
+        // 锁定表名照抄不重算，且不标人工复核
+        assertEquals("t_mytable", r.tableName);
+        assertFalse(r.tableNameNeedsReview);
+        assertTrue(r.ddl.contains("CREATE TABLE `t_mytable`"), r.ddl);
+    }
+
+    @Test
+    void lockedTableNameIllegalIsRejected() {
+        FormInput form = demoForm();
+        form.lockedTableName = "T_Bad-Name";
+
+        GenerationException e = assertThrows(GenerationException.class, () -> service.generate(form));
+        assertEquals("VALIDATION_FAILED", e.code());
+        assertTrue(e.getMessage().contains("锁定表名"), e.getMessage());
+    }
+
     static FormInput demoForm() {
         FormInput form = new FormInput();
         form.tableChineseName = "同业借款合同台账";

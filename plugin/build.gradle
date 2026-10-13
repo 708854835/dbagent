@@ -1,4 +1,55 @@
-// IDEA 插件占位模块（T1 仅占位编译；Kotlin/IntelliJ 插件体系在后续工单接入）
+// IDEA 插件模块（T7）：Kotlin + IntelliJ Platform Gradle 插件 2.x
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.9.24'
+    id 'org.jetbrains.intellij.platform' version '2.1.0'
+}
+
+repositories {
+    mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+version = '1.0.0'
+
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+
+    intellijPlatform {
+        // IDEA 2024.1 Community（验收 5.19：2024.1+ Community 可安装）
+        create('IC', '2024.1.4')
+        instrumentationTools()
+        pluginVerifier()
+    }
+}
+
+intellijPlatform {
+    pluginConfiguration {
+        ideaVersion {
+            // 2024.1+，until 留空不锁上限（开放兼容后续版本）
+            sinceBuild = '241'
+        }
+    }
+    signing {}
+
+    pluginVerification {
+        ides {
+            // 复用已下载的 IC-2024.1.4 做二进制兼容性校验
+            ide('IC', '2024.1.4')
+        }
+    }
+}
+
+// 2.x 默认按 sinceBuild 推导 untilBuild=241.*；剥离 until-build 属性 → 开放兼容后续版本
+tasks.named('patchPluginXml') {
+    doLast {
+        def xml = new File(temporaryDir, 'plugin.xml')
+        def text = xml.getText('UTF-8').replaceAll(/\s+until-build="[^"]*"/, '')
+        xml.setText(text, 'UTF-8')
+    }
 }

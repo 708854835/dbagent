@@ -1,0 +1,30 @@
+<idea-plugin>
+    <id>com.dbagent.plugin</id>
+    <name>DbAgent Table Wizard</name>
+    <vendor>dbagent</vendor>
+
+    <description><![CDATA[
+        DbAgent Table Wizard: form-guided generation of bank-standard MySQL/TXSQL DDL.
+        DbAgent 智能建表向导：向导式表单录入 → 引擎生成符合银行规范的 DDL，
+        逐字段来源徽章预览、锁定重生成、索引勾选、SQL 复制/插入编辑器、Schema 缓存手动刷新。
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService serviceImplementation="com.dbagent.plugin.settings.DbAgentSettings"/>
+        <notificationGroup id="DbAgent" displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <action id="DbAgent.NewTableWizard" class="com.dbagent.plugin.actions.NewTableWizardAction"
+                text="新建数据库表（向导）" description="DbAgent 智能建表向导">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+        <action id="DbAgent.RefreshSchema" class="com.dbagent.plugin.actions.RefreshSchemaAction"
+                text="刷新 Schema 缓存（DbAgent）" description="按归属系统刷新引擎 Schema 缓存">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>

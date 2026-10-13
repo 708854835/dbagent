@@ -143,9 +143,10 @@ public final class EngineCli {
         String password = opts.getOrDefault("--password", "");
         try {
             Path db = EngineDatabase.initialize(dataDir);
-            int count = SchemaCacheRefresher.refresh(jdbc, user, password, system,
-                    new CacheStore(db));
-            System.out.println("Schema 缓存拉取完成: 系统 " + system + "，共 " + count + " 个字段");
+            SchemaCacheRefresher.RefreshStats stats = SchemaCacheRefresher.refresh(
+                    jdbc, user, password, system, new CacheStore(db));
+            System.out.println("Schema 缓存拉取完成: 系统 " + system + "，共 "
+                    + stats.tables() + " 张表 / " + stats.fields() + " 个字段");
         } catch (Exception e) {
             System.err.println("Schema 缓存拉取失败: " + e.getMessage());
             System.exit(1);

@@ -25,3 +25,11 @@ tokens:
     notesId: wangwu
     owningSystem: DEMO
     issuedAt: 2026-01-01
+
+# 归属系统 → 数据源连接（refresh-schema 空参回退：插件端零 JDBC 配置，
+# 仅可刷新 Token 绑定的本系统；口令仅存于引擎侧，不下发插件）
+datasources:
+  DEMO:
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/demo?useSSL=false&serverTimezone=Asia/Shanghai
+    username: demo_user
+    password: demo_password

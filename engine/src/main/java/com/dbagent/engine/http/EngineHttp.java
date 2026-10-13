@@ -36,8 +36,8 @@ import java.util.concurrent.TimeoutException;
  * <pre>
  * POST /generate-ddl    建表向导生成（Token 三方绑定校验后注入 NotesID/归属系统）
  * POST /confirm         已确认候选登记（复核通过的定义回传落库）
- * POST /refresh-schema  按 NotesID 归属系统刷新 Schema 缓存（同步 60s 上限，返回统计；
- *                       不支持刷新其它系统数据）
+ * POST /refresh-schema  按 NotesID 归属系统刷新 Schema 缓存（同步 60s 上限，返回表数/字段数；
+ *                       空参回退引擎侧存储数据源；不支持刷新其它系统数据）
  * GET  /health          无鉴权轻量四状态（status/rulesLoaded/dictLoaded/schemaCacheReady，
  *                       不探外部连通）
  * </pre>
@@ -196,9 +196,30 @@ public final class EngineHttp {
         }
         try {
             JsonNode body = JSON.readTree(readBody(exchange));
-            String jdbcUrl = requiredText(body, "jdbcUrl");
-            String username = requiredText(body, "username");
+            // 空参回退：插件端零 JDBC 配置，按 Token 归属系统取引擎侧存储数据源
+            EngineSettings.DataSource stored =
+                    settings.datasources.get(user.owningSystem());
+            String jdbcUrl = body.path("jdbcUrl").asText("").trim();
+            String username = body.path("username").asText("").trim();
             String password = body.path("password").asText("");
+            if (jdbcUrl.isEmpty()) {
+                if (stored == null || stored.jdbcUrl == null || stored.jdbcUrl.isBlank()) {
+                    auditAndRespond(exchange, 400, user, "refresh-schema", "VALIDATION_FAILED",
+                            errorBody("VALIDATION_FAILED",
+                                    "未提供 jdbcUrl 且引擎未配置系统 " + user.owningSystem()
+                                            + " 的存储数据源，请联系管理员",
+                                    List.of("jdbcUrl")));
+                    return;
+                }
+                jdbcUrl = stored.jdbcUrl;
+                username = stored.username == null ? "" : stored.username;
+                password = stored.password == null ? "" : stored.password;
+            } else if (username.isEmpty()) {
+                auditAndRespond(exchange, 400, user, "refresh-schema", "VALIDATION_FAILED",
+                        errorBody("VALIDATION_FAILED", "缺少参数: username",
+                                List.of("缺少参数: username")));
+                return;
+            }
             // 仅可刷新 Token 绑定的本系统；自称其它系统即拒绝
             String requested = body.path("owningSystem").asText(null);
             if (requested != null && !requested.isBlank()
@@ -210,18 +231,24 @@ public final class EngineHttp {
                 return;
             }
             long started = System.currentTimeMillis();
+            final String fJdbcUrl = jdbcUrl;
+            final String fUsername = username;
+            final String fPassword = password;
             ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
                 Thread t = new Thread(r, "refresh-schema");
                 t.setDaemon(true);
                 return t;
             });
-            Future<Integer> future = executor.submit(() -> SchemaCacheRefresher.refresh(
-                    jdbcUrl, username, password, user.owningSystem(), cacheStore));
+            Future<SchemaCacheRefresher.RefreshStats> future =
+                    executor.submit(() -> SchemaCacheRefresher.refresh(
+                            fJdbcUrl, fUsername, fPassword, user.owningSystem(), cacheStore));
             try {
-                int count = future.get(REFRESH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                SchemaCacheRefresher.RefreshStats stats =
+                        future.get(REFRESH_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 Map<String, Object> ok = new LinkedHashMap<>();
                 ok.put("owningSystem", user.owningSystem());
-                ok.put("fields", count);
+                ok.put("tables", stats.tables());
+                ok.put("fields", stats.fields());
                 ok.put("durationMs", System.currentTimeMillis() - started);
                 auditAndRespond(exchange, 200, user, "refresh-schema", "OK", ok);
             } catch (TimeoutException te) {
@@ -320,13 +347,5 @@ public final class EngineHttp {
             body.put("details", details);
         }
         return body;
-    }
-
-    private static String requiredText(JsonNode body, String field) {
-        String v = body.path(field).asText(null);
-        if (v == null || v.isBlank()) {
-            throw new IllegalArgumentException("缺少参数: " + field);
-        }
-        return v;
     }
 }
