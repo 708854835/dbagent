@@ -1,0 +1,42 @@
+# 字段专用缩写词典（与表名缩写词典独立）
+# 中文词 → 英文缩写（小写下划线连接）
+dictionary:
+  同业: interbank
+  借款: loan
+  借据: debt
+  还款: repayment
+  银行: bank
+  编号: 'no'
+  日期: date
+  合同: contract
+  合同号: contract_no
+  合同编号: contract_no
+  台账: ledger
+  客户: customer
+  客户编号: cust_no
+  客户号: cust_no
+  名称: name
+  客户名称: cust_name
+  机构: org
+  机构编号: org_no
+  机构号: org_no
+  产品: product
+  产品编号: product_no
+  币种: ccy
+  币种代码: ccy
+  金额: amount
+  交易金额: txn_amt
+  交易日期: txn_date
+  交易时间: txn_time
+  起息日: value_date
+  到期日: maturity_date
+  利率: interest_rate
+  余额: balance
+  备注: remark
+  描述: desc
+  状态: status
+  标志: flag
+  创建时间: create_time
+  更新时间: update_time
+  创建人: creator
+  更新人: updater

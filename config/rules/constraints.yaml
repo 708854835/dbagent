@@ -1,0 +1,14 @@
+# 物理建表约束（《数据库设计审核要求》§1/§2/§3）
+charset: utf8mb4
+engine: InnoDB
+# 不使用外键约束
+foreignKeysAllowed: false
+# 单表字段数（含预估补齐数）上限，超出预览期硬拦截提示拆表
+maxFields: 30
+# 索引数量上限
+maxIndexes: 5
+# 自增主键补齐
+autoPrimaryKey:
+  name: id
+  physicalType: BIGINT UNSIGNED
+  comment: 自增主键

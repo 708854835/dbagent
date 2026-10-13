@@ -1,0 +1,68 @@
+# 类型映射（《数据库设计审核要求》§4 数据类型 10 类 → MySQL/TXSQL 物理类型）
+# defaultValue 省略表示该类型不提供字面默认值（如日期/时间类）
+types:
+  编码类:
+    physical: VARCHAR
+    length: 32
+    defaultValue: "''"
+    dataFormat: 'an..{length}'
+  代码类:
+    physical: VARCHAR
+    length: 8
+    defaultValue: "''"
+    dataFormat: 'an..{length}'
+  标志类:
+    physical: TINYINT
+    length: 1
+    defaultValue: '0'
+    dataFormat: n1
+  文本类:
+    physical: VARCHAR
+    length: 128
+    defaultValue: "''"
+    dataFormat: 'anc..{length}'
+  金额类:
+    physical: DECIMAL
+    precision: [18, 2]
+    defaultValue: '0'
+    dataFormat: '16(2)'
+  数值类:
+    physical: DECIMAL
+    precision: [18, 4]
+    defaultValue: '0'
+    dataFormat: '14(4)'
+  比例类:
+    physical: DECIMAL
+    precision: [10, 4]
+    defaultValue: '0'
+    dataFormat: '6(4)'
+  日期类:
+    physical: DATE
+    dataFormat: YYYYMMDD
+  时间类:
+    physical: TIME
+    dataFormat: HHMMSS
+  日期时间类:
+    physical: DATETIME
+    dataFormat: YYYYMMDDHHMMSS
+
+# 推导路径：中文名结尾类词 → 数据类型（按最长匹配）
+endings:
+  编号: 编码类
+  代码: 代码类
+  标志: 标志类
+  名称: 文本类
+  备注: 文本类
+  描述: 文本类
+  金额: 金额类
+  余额: 金额类
+  数量: 数值类
+  人数: 数值类
+  比率: 比例类
+  率: 比例类
+  日期时间: 日期时间类
+  日期: 日期类
+  时间: 日期时间类
+
+# 结尾类词未命中时的兜底类型
+defaultType: 文本类

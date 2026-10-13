@@ -1,0 +1,16 @@
+# 自动补齐的审计字段清单
+# aliasList 为中文名别名；用户录入字段的中文名与任一别名精确匹配时不重复添加
+fields:
+  - englishName: CREATE_TIME
+    physicalType: DATETIME
+    comment: 创建时间
+    aliasList:
+      - 创建时间
+    defaultValue: CURRENT_TIMESTAMP
+  - englishName: UPDATE_TIME
+    physicalType: DATETIME
+    comment: 更新时间
+    aliasList:
+      - 更新时间
+    extra: ON UPDATE CURRENT_TIMESTAMP
+    defaultValue: CURRENT_TIMESTAMP

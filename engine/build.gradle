@@ -1,0 +1,22 @@
+dependencies {
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2'
+    implementation 'org.xerial:sqlite-jdbc:3.46.1.3'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+jar {
+    archiveBaseName = 'engine'
+    archiveVersion = ''
+    manifest {
+        attributes 'Main-Class': 'com.dbagent.engine.cli.EngineCli'
+    }
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// 演示入口：java -jar engine/build/libs/engine.jar generate --input form.json --output result.json

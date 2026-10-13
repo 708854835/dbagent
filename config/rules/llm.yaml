@@ -1,0 +1,8 @@
+# LLM 占位配置（T1 切片：LLM 未接入，规则不能定字段统一标"需人工复核"）
+# enabled: false 表示本期不调用真实 LLM，仅使用规则兜底
+enabled: false
+# 未来接入后控制参数（保留给 T5）
+maxConcurrentColumns: 5
+singleColumnTimeoutSeconds: 3
+overallTimeoutSeconds: 5
+minConfidence: 0.8

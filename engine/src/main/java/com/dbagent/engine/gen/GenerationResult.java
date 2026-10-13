@@ -1,0 +1,51 @@
+package com.dbagent.engine.gen;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 生成结果：DDL 文本 + 逐字段来源徽章 + 待登记字段清单 + 索引建议占位。
+ */
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class GenerationResult {
+
+    public String tableName;
+    public boolean tableNameNeedsReview;
+    public String ddl;
+    public List<FieldView> fields = new ArrayList<>();
+    public List<PendingItem> pendingRegistration = new ArrayList<>();
+    public List<IndexSuggestion> indexSuggestions = new ArrayList<>();
+    public List<String> warnings = new ArrayList<>();
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class FieldView {
+        public String chineseName;
+        public String englishName;
+        public String dataType;
+        public String physicalType;
+        public String badge;
+        public String note;
+    }
+
+    /** 待登记字段清单项：字典项编号留空不虚构，由数据管理员登记时生成。 */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class PendingItem {
+        public String dictItemId = "";
+        public String chineseName;
+        public String englishName;
+        public String importance;
+        public String dataType;
+        public String dataFormat;
+        public String codeList;
+    }
+
+    public static class IndexSuggestion {
+        public String name;
+        public List<String> columns;
+        /** 主键索引不参与勾选 */
+        public boolean fixed;
+        public boolean selected = true;
+    }
+}

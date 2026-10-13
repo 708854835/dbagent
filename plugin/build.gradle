@@ -1,0 +1,4 @@
+// IDEA 插件占位模块（T1 仅占位编译；Kotlin/IntelliJ 插件体系在后续工单接入）
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+}

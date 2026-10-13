@@ -1,0 +1,24 @@
+# 命名规则（《数据库设计审核要求》§1/§2/§4）
+table:
+  prefix: t_
+  # 表名尽量 ≤32 字节，最大 ≤64 字节（UTF-8 字节数）
+  preferredMaxBytes: 32
+  absoluteMaxBytes: 64
+
+field:
+  # 字段英文名 ≤30 字符（ASCII）
+  maxChars: 30
+  # 允许字符：小写字母/数字/下划线
+  pattern: '^[a-z][a-z0-9_]*$'
+  # 需避免的数据库/语言保留字
+  reservedWords:
+    - int
+    - name
+    - time
+    - datetime
+    - password
+    - desc
+    - order
+    - key
+    - primary
+    - index

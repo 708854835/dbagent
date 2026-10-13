@@ -7,6 +7,8 @@
 build/
 out/
 .gradle/
+engine.jar
+result.json
 
 # 运行时数据（部署目录约定：data/ 存 SQLite，logs/ 存日志）
 data/
