@@ -38,7 +38,7 @@ import java.util.Map;
  * 引擎 CLI（免 Token、不走 HTTP，直调核心缝）：
  * <pre>
  * generate        --input form.json --output result.json [--config config] [--data data]
- * serve           [--config config] [--data data]   启动 HTTP 服务（默认 9090，Token 校验）
+ * serve           [--config config] [--data data] [--master-key 主密钥]   启动 HTTP 服务（默认 9090，Token 校验）
  * refresh-schema  --system 系统标识 --jdbc jdbc:mysql://host:3306/db --user 账号 [--password 口令]
  * normalize-comments --system 系统标识 [--batch-size 20] [--batch-interval-ms 1000]
  * </pre>
@@ -70,7 +70,7 @@ public final class EngineCli {
             case "confirm" -> runConfirm(opts, configDir, dataDir);
             case "refresh-schema" -> runRefreshSchema(opts, dataDir);
             case "normalize-comments" -> runNormalizeComments(opts, configDir, dataDir);
-            case "serve" -> runServe(configDir, dataDir);
+            case "serve" -> runServe(opts, configDir, dataDir);
             default -> {
                 usage();
                 System.exit(2);
@@ -176,7 +176,7 @@ public final class EngineCli {
         }
     }
 
-    private static void runServe(Path configDir, Path dataDir) {
+    private static void runServe(Map<String, String> opts, Path configDir, Path dataDir) {
         try {
             EngineConfig config = RulesLoader.load(configDir);
             EngineSettings settings = EngineSettings.load(configDir.resolve("engine.yaml"));
@@ -193,11 +193,16 @@ public final class EngineCli {
             }
             CacheStore cacheStore = new CacheStore(db);
             ConfirmedStore confirmedStore = new ConfirmedStore(db);
+            // 主密钥经启动参数注入（部署脚本持有；缺省回退环境变量；不出现在任何日志）
+            String masterKey = opts.getOrDefault("--master-key",
+                    System.getenv("DBAGENT_MASTER_KEY"));
             HttpServer server = new EngineHttp(settings, config,
                     new SqliteCacheSupply(dictStore, cacheStore, confirmedStore), cacheStore,
-                    confirmedStore, dictStore, LlmProviderFactory.create(config.llm())).start();
-            System.out.println("引擎 HTTP 服务已启动: http://localhost:" + server.getAddress().getPort()
-                    + "（POST /generate, /confirm, /schema-cache/refresh）");
+                    confirmedStore, dictStore, LlmProviderFactory.create(config.llm()),
+                    masterKey).start();
+            System.out.println("引擎 HTTP 服务已启动: http://" + server.getAddress().getHostString()
+                    + ":" + server.getAddress().getPort()
+                    + "（POST /generate-ddl, /confirm, /refresh-schema；GET /health）");
             Thread.currentThread().join();
         } catch (Exception e) {
             System.err.println("服务启动失败: " + e.getMessage());
@@ -240,7 +245,7 @@ public final class EngineCli {
                 用法:
                   java -jar engine.jar generate --input form.json --output result.json [--config config] [--data data]
                   java -jar engine.jar confirm --input confirm.json [--config config] [--data data]
-                  java -jar engine.jar serve [--config config] [--data data]
+                  java -jar engine.jar serve [--config config] [--data data] [--master-key 主密钥]
                   java -jar engine.jar refresh-schema --system 系统标识 --jdbc jdbc:mysql://host:3306/db --user 账号 [--password 口令]
                   java -jar engine.jar normalize-comments --system 系统标识 [--config config] [--data data] [--batch-size 20] [--batch-interval-ms 1000]
                 """);

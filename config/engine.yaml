@@ -1,11 +1,27 @@
 http:
   port: 9090
+  # 监听绑定地址（内网网卡，不暴露公网）
+  host: 127.0.0.1
 
-# Token → 用户上下文（notesId / 本系统标识）。HTTP 登录态校验用，CLI 免 Token。
+logs:
+  # 审计日志 audit.log（append-only）与运行日志 engine.log 分离
+  dir: logs
+
+# Token 清单（opaque，配置文件维护，重启轮换）：
+# - 签发日起 90 天有效，过期与无效不区分，统一 401；
+# - NotesID↔Token 一对一：同 NotesID 仅最新签发有效（签发新即作废旧）；
+# - token 值可为明文，或 "hmac:<hex>"（HMAC-SHA256(主密钥, 明文 Token)，主密钥经启动参数 --master-key 注入）。
 tokens:
-  demo-token-zhangsan:
+  - token: demo-token-zhangsan
     notesId: zhangsan
-    owningSystem: loan-system
-  demo-token-lisi:
+    owningSystem: DEMO
+    issuedAt: 2026-10-13
+  - token: demo-token-lisi
     notesId: lisi
     owningSystem: deposit-system
+    issuedAt: 2026-10-13
+  # 已过期演示条目（2026-01-01 签发，超 90 天 → 401）
+  - token: demo-token-expired
+    notesId: wangwu
+    owningSystem: DEMO
+    issuedAt: 2026-01-01

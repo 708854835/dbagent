@@ -94,8 +94,18 @@ public final class CacheStore {
         return rows;
     }
 
-    /**
-     * 规范化 COMMENT 按键回填：缓存原文与落库原文一致才替换为规范化名（防陈旧），
+    /** 全系统缓存总行数（/health 的 schemaCacheReady 判定用）。 */
+    public int totalCount() {
+        try (Connection conn = connect();
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM schema_field")) {
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Schema 缓存统计失败", e);
+        }
+    }
+
+    /** 规范化 COMMENT 按键回填：缓存原文与落库原文一致才替换为规范化名（防陈旧），
      * 不重新跑规范化。normalized_comment 表不存在时静默跳过（如单测独立建库）。
      *
      * @return 回填行数

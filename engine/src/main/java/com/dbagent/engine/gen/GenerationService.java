@@ -466,16 +466,23 @@ public final class GenerationService {
     }
 
     private void validate(FormInput form) {
+        List<String> violations = new ArrayList<>();
         if (form == null || form.tableChineseName == null || form.tableChineseName.isBlank()) {
-            throw new GenerationException("VALIDATION_FAILED", "表中文名为空（阻断级）");
+            violations.add("表中文名为空（阻断级）");
         }
-        if (form.fields == null || form.fields.isEmpty()) {
-            throw new GenerationException("VALIDATION_FAILED", "字段清单为空（阻断级）");
-        }
-        for (FormField f : form.fields) {
-            if (f.chineseName == null || f.chineseName.isBlank()) {
-                throw new GenerationException("VALIDATION_FAILED", "存在字段中文名为空（阻断级）");
+        if (form == null || form.fields == null || form.fields.isEmpty()) {
+            violations.add("字段清单为空（阻断级）");
+        } else {
+            for (int i = 0; i < form.fields.size(); i++) {
+                FormField f = form.fields.get(i);
+                if (f.chineseName == null || f.chineseName.isBlank()) {
+                    violations.add("第 " + (i + 1) + " 个字段中文名为空（阻断级）");
+                }
             }
+        }
+        if (!violations.isEmpty()) {
+            throw new GenerationException("VALIDATION_FAILED",
+                    "表单校验未通过（" + violations.size() + " 项）", violations);
         }
     }
 
