@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 /**
  * 三级决策链：本系统复用 → 字典贯标 → 缩写词典推导。
- * 词典未覆盖词转 LLM 辅助在 LLM 工单接入，本切片标"需人工复核"占位。
+ * 词典未覆盖词标"需人工复核"并打 llmEligible，由生成服务缝转 LLM 辅助命名。
  */
 public final class DecisionChain {
 
@@ -106,9 +106,10 @@ public final class DecisionChain {
         // ③ 缩写词典推导
         AbbreviationDictionary.Derivation derivation = fieldAbbrev.derive(chineseName);
         if (!derivation.fullyCovered()) {
-            // LLM 辅助接入前占位：标"需人工复核"，不静默采用
+            // 词典未覆盖：先标"需人工复核"，由生成服务缝转 LLM 辅助（LLM 未启用时维持复核）
             return FieldDecision.needsReview(chineseName,
-                    "缩写词典未覆盖: " + String.join("/", derivation.uncovered()));
+                    "缩写词典未覆盖: " + String.join("/", derivation.uncovered()))
+                    .markLlmEligible();
         }
         String englishName = derivation.joined();
         if (englishName.length() > naming.field.maxChars) {

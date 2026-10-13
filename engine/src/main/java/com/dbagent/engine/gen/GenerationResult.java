@@ -13,6 +13,8 @@ public class GenerationResult {
 
     public String tableName;
     public boolean tableNameNeedsReview;
+    /** LLM 表名建议候选（含置信度与理由；表名降级人工复核时供参考） */
+    public List<com.dbagent.engine.llm.LlmNamingProvider.Candidate> tableNameLlmCandidates;
     public String ddl;
     public List<FieldView> fields = new ArrayList<>();
     public List<PendingItem> pendingRegistration = new ArrayList<>();
@@ -33,9 +35,14 @@ public class GenerationResult {
         public List<com.dbagent.engine.cache.CacheSupply.CachedField> candidates;
         /** 锁定字段（增量重生成输入携带 locked=true）：true 时输出，供下次重生成回传 */
         public Boolean locked;
+        /** LLM 建议候选（含置信度与理由；降级复核时供人工参考） */
+        public List<com.dbagent.engine.llm.LlmNamingProvider.Candidate> llmCandidates;
     }
 
-    /** 待登记字段清单项：字典项编号留空不虚构，由数据管理员登记时生成。 */
+    /**
+     * 待登记字段清单项：推导路径字典项编号留空不虚构，由数据管理员登记时生成；
+     * LLM·候选路径编号占位 IP00000000（登记闭环时替换为正式编号）。
+     */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class PendingItem {
         public String dictItemId = "";

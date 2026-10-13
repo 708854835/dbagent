@@ -1,0 +1,12 @@
+{
+  "tableChineseName": "同业借款合同台账",
+  "description": "LLM 辅助命名演示：词典未覆盖词走桩 LLM",
+  "notesId": "zhangsan",
+  "fields": [
+    { "chineseName": "合同编号", "required": true, "length": 32 },
+    { "chineseName": "币种", "required": true },
+    { "chineseName": "特殊目的载体", "length": 64 },
+    { "chineseName": "受托机构", "length": 64 },
+    { "chineseName": "估值基准日" }
+  ]
+}

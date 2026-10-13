@@ -11,7 +11,8 @@ import java.sql.Statement;
 
 /**
  * SQLite 落库（data/engine.db，WAL 模式）。
- * 各表 DDL 就位：已确认候选（ConfirmedStore）、字典快照与 meta（DictStore）、Schema 缓存（CacheStore）。
+ * 各表 DDL 就位：已确认候选（ConfirmedStore）、字典快照与 meta（DictStore）、
+ * Schema 缓存（CacheStore）、规范化 COMMENT（NormalizedCommentStore）。
  */
 public final class EngineDatabase {
 
@@ -33,6 +34,7 @@ public final class EngineDatabase {
             stmt.execute(DictStore.META_DDL);
             stmt.execute(CacheStore.DDL);
             stmt.execute(CacheStore.INDEX_DDL);
+            stmt.execute(NormalizedCommentStore.DDL);
         } catch (SQLException e) {
             throw new IllegalStateException("SQLite 初始化失败: " + db, e);
         }

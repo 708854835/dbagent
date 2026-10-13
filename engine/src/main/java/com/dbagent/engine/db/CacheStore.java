@@ -67,8 +67,71 @@ public final class CacheStore {
                 ps.executeBatch();
             }
             conn.commit();
+            backfillNormalizedComments(owningSystem);
         } catch (SQLException e) {
             throw new IllegalStateException("Schema 缓存写入失败: " + owningSystem, e);
+        }
+    }
+
+    /** 全量读取该系统缓存行（离线 COMMENT 规范化用）。 */
+    public List<Row> listRows(String owningSystem) {
+        String sql = "SELECT table_name, column_name, column_type, column_comment"
+                + " FROM schema_field WHERE owning_system = ?"
+                + " ORDER BY table_name, column_name";
+        List<Row> rows = new ArrayList<>();
+        try (Connection conn = connect();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, owningSystem);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    rows.add(new Row(rs.getString("table_name"), rs.getString("column_name"),
+                            rs.getString("column_type"), rs.getString("column_comment")));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Schema 缓存读取失败: " + owningSystem, e);
+        }
+        return rows;
+    }
+
+    /**
+     * 规范化 COMMENT 按键回填：缓存原文与落库原文一致才替换为规范化名（防陈旧），
+     * 不重新跑规范化。normalized_comment 表不存在时静默跳过（如单测独立建库）。
+     *
+     * @return 回填行数
+     */
+    public int backfillNormalizedComments(String owningSystem) {
+        try (Connection conn = connect();
+             Statement stmt = conn.createStatement()) {
+            try (ResultSet rs = stmt.executeQuery(
+                    "SELECT 1 FROM sqlite_master WHERE type='table'"
+                            + " AND name='normalized_comment'")) {
+                if (!rs.next()) {
+                    return 0;
+                }
+            }
+            String sql = """
+                    UPDATE schema_field
+                    SET column_comment = (
+                      SELECT n.normalized_name FROM normalized_comment n
+                      WHERE n.owning_system = schema_field.owning_system
+                        AND n.table_name = schema_field.table_name
+                        AND n.column_name = schema_field.column_name
+                        AND n.raw_comment = schema_field.column_comment)
+                    WHERE owning_system = ?
+                      AND EXISTS (
+                        SELECT 1 FROM normalized_comment n
+                        WHERE n.owning_system = schema_field.owning_system
+                          AND n.table_name = schema_field.table_name
+                          AND n.column_name = schema_field.column_name
+                          AND n.raw_comment = schema_field.column_comment)
+                    """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, owningSystem);
+                return ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("规范化 COMMENT 回填失败: " + owningSystem, e);
         }
     }
 

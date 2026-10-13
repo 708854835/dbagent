@@ -1,0 +1,12 @@
+{
+  "tableChineseName": "客户台账",
+  "description": "离线 COMMENT 规范化演示：脏 COMMENT 规范化后复用命中",
+  "notesId": "zhangsan",
+  "owningSystem": "DEMO",
+  "fields": [
+    { "chineseName": "客户编号", "required": true, "length": 32 },
+    { "chineseName": "机构编号", "required": true },
+    { "chineseName": "性别" },
+    { "chineseName": "额度状态" }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "tableChineseName": "特殊目的载体资产池",
+  "description": "表名 LLM 辅助演示：缩写词典未覆盖词走桩 LLM",
+  "notesId": "zhangsan",
+  "fields": [
+    { "chineseName": "合同编号", "required": true, "length": 32 },
+    { "chineseName": "特殊目的载体", "length": 64 }
+  ]
+}

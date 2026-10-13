@@ -2,10 +2,12 @@ package com.dbagent.engine.cli;
 
 import com.dbagent.engine.cache.ConfirmedService;
 import com.dbagent.engine.cache.SqliteCacheSupply;
+import com.dbagent.engine.comment.NormalizeCommentService;
 import com.dbagent.engine.db.CacheStore;
 import com.dbagent.engine.db.ConfirmedStore;
 import com.dbagent.engine.db.DictStore;
 import com.dbagent.engine.db.EngineDatabase;
+import com.dbagent.engine.db.NormalizedCommentStore;
 import com.dbagent.engine.db.SchemaCacheRefresher;
 import com.dbagent.engine.dict.DictImportReport;
 import com.dbagent.engine.dict.DictImporter;
@@ -16,6 +18,8 @@ import com.dbagent.engine.gen.GenerationResult;
 import com.dbagent.engine.gen.GenerationService;
 import com.dbagent.engine.http.EngineHttp;
 import com.dbagent.engine.http.EngineSettings;
+import com.dbagent.engine.llm.LlmAssistService;
+import com.dbagent.engine.llm.LlmProviderFactory;
 import com.dbagent.engine.rules.EngineConfig;
 import com.dbagent.engine.rules.RulesLoader;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +40,7 @@ import java.util.Map;
  * generate        --input form.json --output result.json [--config config] [--data data]
  * serve           [--config config] [--data data]   启动 HTTP 服务（默认 9090，Token 校验）
  * refresh-schema  --system 系统标识 --jdbc jdbc:mysql://host:3306/db --user 账号 [--password 口令]
+ * normalize-comments --system 系统标识 [--batch-size 20] [--batch-interval-ms 1000]
  * </pre>
  */
 public final class EngineCli {
@@ -64,6 +69,7 @@ public final class EngineCli {
             case "generate" -> runGenerate(opts, configDir, dataDir);
             case "confirm" -> runConfirm(opts, configDir, dataDir);
             case "refresh-schema" -> runRefreshSchema(opts, dataDir);
+            case "normalize-comments" -> runNormalizeComments(opts, configDir, dataDir);
             case "serve" -> runServe(configDir, dataDir);
             default -> {
                 usage();
@@ -90,9 +96,12 @@ public final class EngineCli {
                 System.exit(1);
             }
             FormInput form = JSON.readValue(input.toFile(), FormInput.class);
-            GenerationResult result = new GenerationService(
-                    config, new SqliteCacheSupply(dictStore, new CacheStore(db),
-                            new ConfirmedStore(db))).generate(form);
+            GenerationResult result;
+            try (LlmAssistService llm = LlmProviderFactory.create(config.llm())) {
+                result = new GenerationService(
+                        config, new SqliteCacheSupply(dictStore, new CacheStore(db),
+                                new ConfirmedStore(db)), llm).generate(form);
+            }
             JSON.writeValue(output.toFile(), result);
             System.out.println("生成成功: 表 " + result.tableName + "，字段 " + result.fields.size()
                     + " 个，待登记 " + result.pendingRegistration.size() + " 项 → " + output);
@@ -143,6 +152,30 @@ public final class EngineCli {
         }
     }
 
+    /**
+     * 离线 COMMENT 规范化：确定性清洗优先、LLM 兜底、按批限流；
+     * 结果独立落库 normalized_comment，结束后按键回填当前 Schema 缓存。
+     */
+    private static void runNormalizeComments(Map<String, String> opts, Path configDir,
+                                             Path dataDir) {
+        String system = required(opts, "--system");
+        int batchSize = Integer.parseInt(opts.getOrDefault("--batch-size", "20"));
+        long batchInterval = Long.parseLong(opts.getOrDefault("--batch-interval-ms", "1000"));
+        try {
+            EngineConfig config = RulesLoader.load(configDir);
+            Path db = EngineDatabase.initialize(dataDir);
+            try (LlmAssistService llm = LlmProviderFactory.create(config.llm())) {
+                var report = new NormalizeCommentService(new CacheStore(db),
+                        new NormalizedCommentStore(db), llm)
+                        .normalize(system, batchSize, batchInterval);
+                System.out.println(report.summaryLine());
+            }
+        } catch (Exception e) {
+            System.err.println("COMMENT 规范化失败: " + e.getMessage());
+            System.exit(1);
+        }
+    }
+
     private static void runServe(Path configDir, Path dataDir) {
         try {
             EngineConfig config = RulesLoader.load(configDir);
@@ -162,7 +195,7 @@ public final class EngineCli {
             ConfirmedStore confirmedStore = new ConfirmedStore(db);
             HttpServer server = new EngineHttp(settings, config,
                     new SqliteCacheSupply(dictStore, cacheStore, confirmedStore), cacheStore,
-                    confirmedStore, dictStore).start();
+                    confirmedStore, dictStore, LlmProviderFactory.create(config.llm())).start();
             System.out.println("引擎 HTTP 服务已启动: http://localhost:" + server.getAddress().getPort()
                     + "（POST /generate, /confirm, /schema-cache/refresh）");
             Thread.currentThread().join();
@@ -209,6 +242,7 @@ public final class EngineCli {
                   java -jar engine.jar confirm --input confirm.json [--config config] [--data data]
                   java -jar engine.jar serve [--config config] [--data data]
                   java -jar engine.jar refresh-schema --system 系统标识 --jdbc jdbc:mysql://host:3306/db --user 账号 [--password 口令]
+                  java -jar engine.jar normalize-comments --system 系统标识 [--config config] [--data data] [--batch-size 20] [--batch-interval-ms 1000]
                 """);
     }
 }

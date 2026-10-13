@@ -10,6 +10,7 @@ import com.dbagent.engine.form.ConfirmInput;
 import com.dbagent.engine.form.FormInput;
 import com.dbagent.engine.gen.GenerationException;
 import com.dbagent.engine.gen.GenerationService;
+import com.dbagent.engine.llm.LlmAssistService;
 import com.dbagent.engine.rules.EngineConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,21 +42,24 @@ public final class EngineHttp {
     private final CacheStore cacheStore;
     private final ConfirmedStore confirmedStore;
     private final DictStore dictStore;
+    private final LlmAssistService llmAssist;
 
     public EngineHttp(EngineSettings settings, EngineConfig rules,
                       CacheSupply cacheSupply, CacheStore cacheStore) {
-        this(settings, rules, cacheSupply, cacheStore, null, null);
+        this(settings, rules, cacheSupply, cacheStore, null, null, null);
     }
 
     public EngineHttp(EngineSettings settings, EngineConfig rules,
                       CacheSupply cacheSupply, CacheStore cacheStore,
-                      ConfirmedStore confirmedStore, DictStore dictStore) {
+                      ConfirmedStore confirmedStore, DictStore dictStore,
+                      LlmAssistService llmAssist) {
         this.settings = settings;
         this.rules = rules;
         this.cacheSupply = cacheSupply;
         this.cacheStore = cacheStore;
         this.confirmedStore = confirmedStore;
         this.dictStore = dictStore;
+        this.llmAssist = llmAssist;
     }
 
     public HttpServer start() throws IOException {
@@ -77,7 +81,7 @@ public final class EngineHttp {
             // Token 登录态校验后注入 user 上下文（覆盖表单内的自称身份）
             form.notesId = user.notesId();
             form.owningSystem = user.owningSystem();
-            Object result = new GenerationService(rules, cacheSupply).generate(form);
+            Object result = new GenerationService(rules, cacheSupply, llmAssist).generate(form);
             respond(exchange, 200, result);
         } catch (GenerationException e) {
             respond(exchange, 422, errorBody(e.code(), e.getMessage()));

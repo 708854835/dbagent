@@ -1,8 +1,46 @@
-# LLM 占位配置（T1 切片：LLM 未接入，规则不能定字段统一标"需人工复核"）
-# enabled: false 表示本期不调用真实 LLM，仅使用规则兜底
+# LLM 辅助命名配置（T4 接入：词典未覆盖词走 LLM 建议，超时/异常一律降级"需人工复核"）
+# enabled: false 表示不调用任何 LLM，规则不能定的字段统一标"需人工复核"（提交口径）
 enabled: false
-# 未来接入后控制参数（保留给 T5）
+# provider 目前仅支持 stub（演示/测试桩，无需真实 LLM）；真实 LLM 接入时扩展工厂
+provider: stub
+# 并发上限：同时请求 LLM 的字段数
 maxConcurrentColumns: 5
+# 单字段超时（秒）：超时降级，不阻断生成
 singleColumnTimeoutSeconds: 3
+# 整表整体超时（秒）：覆盖全部 LLM 字段的总预算
 overallTimeoutSeconds: 5
+# 采纳阈值：置信度 ≥ minConfidence 的候选恰好唯一时才自动采用（徽章 LLM·候选）
 minConfidence: 0.8
+# 每字段候选上限（按置信度降序截取）
+maxCandidates: 3
+# 桩配置：演示/测试用（真实 LLM 接入后无效）
+stub:
+  # 默认响应延迟（毫秒）
+  latencyMillis: 0
+  # 慢响应字段名单（命中后用 slowLatencyMillis，演示超时降级）
+  slowNames: [估值基准日]
+  slowLatencyMillis: 6000
+  # 模拟调用失败的字段名单
+  failNames: []
+  # 预置候选：字段中文名 → 候选清单（未配置的字段返回空候选）
+  candidates:
+    特殊目的载体:
+      - englishName: spv
+        confidence: 0.92
+        rationale: "Special Purpose Vehicle 业界通用缩写，资管/同业业务标准译法"
+    受托机构:
+      - englishName: trustee_org
+        confidence: 0.85
+        rationale: "受托对应 trustee，机构缩写 org"
+      - englishName: entrust_org
+        confidence: 0.83
+        rationale: "受托也可译作 entrust（委托受托语境）"
+  # 预置表名候选：表中文名 → 候选清单（小写连写、不含 t_ 前缀）
+  tableCandidates:
+    特殊目的载体资产池:
+      - englishName: spvpool
+        confidence: 0.91
+        rationale: "特殊目的载体业界通用缩写 SPV + 资产池 pool 连写"
+  # 预置 COMMENT 规范化结果：原始 COMMENT → 标准 JSON（未配置的抛异常模拟失败）
+  commentResults:
+    "额度状态？？详见附件【2023版】": '{"name":"额度状态"}'
