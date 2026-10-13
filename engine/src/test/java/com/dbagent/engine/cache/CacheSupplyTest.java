@@ -9,6 +9,7 @@ import com.dbagent.engine.rules.RulesLoader;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -53,7 +54,8 @@ class CacheSupplyTest {
     @Test
     void dictItemHitIsStandardizedWhenSchemaCacheMisses() {
         InMemoryCacheSupply cache = new InMemoryCacheSupply()
-                .putDictItem(new CacheSupply.DictItem("借款金额", "loan_amt", "金额类", "16(2)", "公共集"));
+                .putDictItem(new CacheSupply.DictItem("IP00000006", "借款金额", "loan_amt",
+                        "公共集", "金额类", "16(2)", List.of(), null, false));
         DecisionChain chain = newChain(cache);
 
         FormField field = new FormField();

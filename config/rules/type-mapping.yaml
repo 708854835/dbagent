@@ -1,50 +1,78 @@
 # 类型映射（《数据库设计审核要求》§4 数据类型 10 类 → MySQL/TXSQL 物理类型）
 # defaultValue 省略表示该类型不提供字面默认值（如日期/时间类）
+# allowedFormats 为数据格式合法性约束（贯标导入校验）：
+#   CHAR_SEQ_FIXED 定长字符序列（n6/an3/anc5）；CHAR_SEQ_MAX 最大长度（an..32/anc..128）
+#   DECIMAL 小数 N(M)；DECIMAL_FRAC_GT0 小数且小数位 >0；DATE/TIME/DATETIME 对应日期时间格式
 types:
   编码类:
     physical: VARCHAR
     length: 32
     defaultValue: "''"
     dataFormat: 'an..{length}'
+    # 编码类按编码规则设计长度，不可预留（仅定长）
+    allowedFormats: [CHAR_SEQ_FIXED]
   代码类:
     physical: VARCHAR
     length: 8
     defaultValue: "''"
     dataFormat: 'an..{length}'
+    # 代码类长度按取值设计，不可预留（仅定长）
+    allowedFormats: [CHAR_SEQ_FIXED]
   标志类:
     physical: TINYINT
     length: 1
     defaultValue: '0'
     dataFormat: n1
+    allowedFormats: [CHAR_SEQ_FIXED]
   文本类:
     physical: VARCHAR
     length: 128
     defaultValue: "''"
     dataFormat: 'anc..{length}'
+    allowedFormats: [CHAR_SEQ_FIXED, CHAR_SEQ_MAX]
   金额类:
     physical: DECIMAL
     precision: [18, 2]
     defaultValue: '0'
     dataFormat: '16(2)'
+    # 金额类仅 N(M) 格式
+    allowedFormats: [DECIMAL]
   数值类:
     physical: DECIMAL
     precision: [18, 4]
     defaultValue: '0'
     dataFormat: '14(4)'
+    # 数值类仅 N(M)，且不允许 M(0)
+    allowedFormats: [DECIMAL_FRAC_GT0]
   比例类:
     physical: DECIMAL
     precision: [10, 4]
     defaultValue: '0'
     dataFormat: '6(4)'
+    # 比例类仅 N(M) 格式
+    allowedFormats: [DECIMAL]
   日期类:
     physical: DATE
     dataFormat: YYYYMMDD
+    # 日期类仅 YYYYMMDD
+    allowedFormats: [DATE]
   时间类:
     physical: TIME
     dataFormat: HHMMSS
+    # 时间类仅 HHMMSS / HHMMSS.S...S
+    allowedFormats: [TIME]
   日期时间类:
     physical: DATETIME
     dataFormat: YYYYMMDDHHMMSS
+    # 日期时间类仅 YYYYMMDDHHMMSS / YYYYMMDDTHHMMSS.S...S
+    allowedFormats: [DATETIME]
+
+# 业务口述记法 → 标准记法映射（字典导入时归一化）
+formatAliases:
+  - { pattern: '^(\d+)!anc$', replacement: 'anc$1' }
+  - { pattern: '^(\d+)!an$', replacement: 'an$1' }
+  - { pattern: '^(\d+)!a$', replacement: 'a$1' }
+  - { pattern: '^(\d+)!n$', replacement: 'n$1' }
 
 # 推导路径：中文名结尾类词 → 数据类型（按最长匹配）
 endings:

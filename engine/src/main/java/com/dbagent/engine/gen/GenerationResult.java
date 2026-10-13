@@ -27,6 +27,8 @@ public class GenerationResult {
         public String physicalType;
         public String badge;
         public String note;
+        /** 代码类完整代码清单（COMMENT 只写摘要，完整清单随结果单独输出） */
+        public List<com.dbagent.engine.cache.CacheSupply.Code> codeList;
     }
 
     /** 待登记字段清单项：字典项编号留空不虚构，由数据管理员登记时生成。 */

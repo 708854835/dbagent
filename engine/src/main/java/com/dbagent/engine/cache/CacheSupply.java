@@ -4,7 +4,7 @@ import java.util.List;
 
 /**
  * 缓存供给缝：决策链经此接口读本系统 Schema 缓存 / 字典快照。
- * T1 切片以内存 fake 注入（未命中全部走推导）；JDBC 拉取与 SQLite 落库在后续工单接入。
+ * 本系统 Schema 缓存随后在复用工单接入；字典快照经 SQLite 供给（全局一份）。
  */
 public interface CacheSupply {
 
@@ -21,8 +21,20 @@ public interface CacheSupply {
     record CachedField(String chineseName, String englishName, String physicalType) {
     }
 
-    /** 字典项（本切片最小结构；代码清单/编码规则等随贯标工单扩展）。 */
-    record DictItem(String chineseName, String englishName, String dataType, String dataFormat,
-                    String importance) {
+    /**
+     * 字典数据项（对齐字典快照导出字段）。
+     * formatIllegal 为 true 时表示数据格式/英文名称非法，照常入库、贯标命中标"需人工复核"。
+     */
+    record DictItem(String id, String chineseName, String englishName, String importance,
+                    String dataType, String dataFormat, List<Code> codeList, String codeRule,
+                    boolean formatIllegal) {
+
+        public boolean isPublicSet() {
+            return "公共集".equals(importance);
+        }
+    }
+
+    /** 代码清单项："取值 → 名称"键值对。 */
+    record Code(String code, String name) {
     }
 }

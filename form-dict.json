@@ -1,0 +1,14 @@
+{
+  "tableChineseName": "同业借款合同台账",
+  "description": "同业借款合同登记台账",
+  "notesId": "zhangsan",
+  "fields": [
+    { "chineseName": "合同编号", "required": true, "length": 32 },
+    { "chineseName": "币种", "required": true },
+    { "chineseName": "客户名称", "required": true },
+    { "chineseName": "机构编号", "required": true },
+    { "chineseName": "借款金额", "required": true },
+    { "chineseName": "交易日期", "required": false },
+    { "chineseName": "备注", "required": false, "length": 256 }
+  ]
+}

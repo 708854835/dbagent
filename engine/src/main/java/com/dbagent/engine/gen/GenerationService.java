@@ -101,8 +101,11 @@ public final class GenerationService {
             if (!d.isUsable()) {
                 continue;
             }
+            String comment = d.commentSuffix() != null
+                    ? d.chineseName() + "（" + d.commentSuffix() + "）"
+                    : d.chineseName();
             columns.add(new DdlBuilder.Column(d.englishName(), d.physicalType(),
-                    defaultValueFor(d), null, d.chineseName()));
+                    defaultValueFor(d), null, comment));
         }
         for (AuditFieldRules.AuditField a : audits) {
             columns.add(new DdlBuilder.Column(a.englishName, a.physicalType,
@@ -124,6 +127,7 @@ public final class GenerationService {
             view.physicalType = d.physicalType();
             view.badge = d.badge().display();
             view.note = d.note();
+            view.codeList = d.codeList();
             result.fields.add(view);
 
             if (d.badge() == Badge.DERIVED) {

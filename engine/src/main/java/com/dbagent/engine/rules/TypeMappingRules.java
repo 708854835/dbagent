@@ -2,15 +2,18 @@ package com.dbagent.engine.rules;
 
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
- * 类型映射规则（type-mapping.yaml）：数据类型 10 类 → 物理类型，及推导路径结尾类词推断。
+ * 类型映射规则（type-mapping.yaml）：数据类型 10 类 → 物理类型，推导路径结尾类词推断，
+ * 字典贯标的数据格式合法性校验与格式→物理类型映射。
  */
 public class TypeMappingRules {
 
     public Map<String, TypeDef> types = Map.of();
     public Map<String, String> endings = Map.of();
     public String defaultType = "文本类";
+    public List<FormatAlias> formatAliases = List.of();
 
     public static class TypeDef {
         public String physical;
@@ -18,6 +21,12 @@ public class TypeMappingRules {
         public List<Integer> precision;
         public String defaultValue;
         public String dataFormat;
+        public List<String> allowedFormats = List.of();
+    }
+
+    public static class FormatAlias {
+        public String pattern;
+        public String replacement;
     }
 
     /** 推导路径：按中文名结尾类词最长匹配推断数据类型，未命中取兜底类型。 */
@@ -81,5 +90,60 @@ public class TypeMappingRules {
             return (p.get(0) - p.get(1)) + "(" + p.get(1) + ")";
         }
         return fmt;
+    }
+
+    /** 业务口述记法 → 标准记法（如 6!n → n6），首条命中规则生效。 */
+    public String normalizeFormat(String format) {
+        if (format == null) {
+            return null;
+        }
+        String f = format.trim();
+        for (FormatAlias alias : formatAliases) {
+            if (Pattern.compile(alias.pattern).matcher(f).matches()) {
+                return f.replaceAll(alias.pattern, alias.replacement);
+            }
+        }
+        return f;
+    }
+
+    /** 数据格式合法性校验：按数据类型的 allowedFormats 约束判定。 */
+    public boolean isFormatLegal(String dataType, String format) {
+        DataFormat fmt = DataFormat.parse(format);
+        if (fmt == null) {
+            return false;
+        }
+        List<String> allowed = type(dataType).allowedFormats;
+        return switch (fmt.kind()) {
+            case DATE -> allowed.contains("DATE");
+            case TIME -> allowed.contains("TIME");
+            case DATETIME -> allowed.contains("DATETIME");
+            case CHAR_SEQ -> fmt.fixed()
+                    ? allowed.contains("CHAR_SEQ_FIXED")
+                    : allowed.contains("CHAR_SEQ_MAX");
+            case DECIMAL -> fmt.fracDigits() > 0
+                    ? allowed.contains("DECIMAL") || allowed.contains("DECIMAL_FRAC_GT0")
+                    : allowed.contains("DECIMAL");
+        };
+    }
+
+    /**
+     * 贯标路径：字典标准类型 + 数据格式 → 物理类型。
+     * 代码类长度按取值设计（codeListMaxLen 来自代码清单最大取值长度），不预留。
+     */
+    public String physicalFromDict(String dataType, DataFormat fmt, int codeListMaxLen) {
+        return switch (fmt.kind()) {
+            case DATE -> "DATE";
+            case TIME -> "TIME";
+            case DATETIME -> "DATETIME";
+            case DECIMAL -> "DECIMAL(" + (fmt.intDigits() + fmt.fracDigits()) + ","
+                    + fmt.fracDigits() + ")";
+            case CHAR_SEQ -> {
+                if ("标志类".equals(dataType)) {
+                    yield "TINYINT(1)";
+                }
+                int len = codeListMaxLen > 0 ? codeListMaxLen : fmt.length();
+                yield "VARCHAR(" + len + ")";
+            }
+        };
     }
 }

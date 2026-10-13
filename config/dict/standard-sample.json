@@ -1,0 +1,63 @@
+[
+  {
+    "id": "IP00000001",
+    "chineseName": "币种",
+    "englishName": "ccy",
+    "importance": "公共集",
+    "dataType": "代码类",
+    "dataFormat": "an3",
+    "codeList": [
+      { "code": "CNY", "name": "人民币" },
+      { "code": "USD", "name": "美元" },
+      { "code": "EUR", "name": "欧元" },
+      { "code": "JPY", "name": "日元" },
+      { "code": "HKD", "name": "港币" },
+      { "code": "GBP", "name": "英镑" }
+    ],
+    "codeRule": "ISO 4217 3 位字母编码"
+  },
+  {
+    "id": "IP00000002",
+    "chineseName": "币种",
+    "englishName": "currency_type",
+    "importance": "自治级",
+    "dataType": "代码类",
+    "dataFormat": "an3",
+    "codeList": [
+      { "code": "CNY", "name": "人民币" },
+      { "code": "USD", "name": "美元" }
+    ]
+  },
+  {
+    "id": "IP00000003",
+    "chineseName": "客户名称",
+    "englishName": "Cust_Name",
+    "importance": "公共集",
+    "dataType": "文本类",
+    "dataFormat": "anc..128"
+  },
+  {
+    "id": "IP00000004",
+    "chineseName": "机构编号",
+    "englishName": "org_no",
+    "importance": "公共集",
+    "dataType": "编码类",
+    "dataFormat": "6!an"
+  },
+  {
+    "id": "IP00000005",
+    "chineseName": "交易日期",
+    "englishName": "txn_date",
+    "importance": "公共集",
+    "dataType": "日期类",
+    "dataFormat": "YYYY-MM-DD"
+  },
+  {
+    "id": "IP00000006",
+    "chineseName": "借款金额",
+    "englishName": "loan_amt",
+    "importance": "公共集",
+    "dataType": "金额类",
+    "dataFormat": "16(2)"
+  }
+]

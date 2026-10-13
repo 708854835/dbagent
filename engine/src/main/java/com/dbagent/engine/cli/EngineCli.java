@@ -1,7 +1,10 @@
 package com.dbagent.engine.cli;
 
-import com.dbagent.engine.cache.InMemoryCacheSupply;
+import com.dbagent.engine.cache.SqliteCacheSupply;
+import com.dbagent.engine.db.DictStore;
 import com.dbagent.engine.db.EngineDatabase;
+import com.dbagent.engine.dict.DictImportReport;
+import com.dbagent.engine.dict.DictImporter;
 import com.dbagent.engine.form.FormInput;
 import com.dbagent.engine.gen.GenerationException;
 import com.dbagent.engine.gen.GenerationResult;
@@ -49,9 +52,20 @@ public final class EngineCli {
         ObjectMapper json = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
         try {
             EngineConfig config = RulesLoader.load(configDir);
-            EngineDatabase.initialize(dataDir);
+            Path db = EngineDatabase.initialize(dataDir);
+            // 字典快照导入（整体替换；冲突回滚并拒绝生成）
+            DictStore dictStore = new DictStore(db);
+            DictImportReport report = DictImporter.importAll(
+                    configDir.resolve("dict"), dictStore, config.typeMapping());
+            if (report.totalItems() > 0 || report.hasConflicts()) {
+                System.out.println(report.summaryLine());
+            }
+            if (report.hasConflicts()) {
+                writeError(json, output, "DICT_IMPORT_CONFLICT", report.summaryLine());
+                System.exit(1);
+            }
             FormInput form = json.readValue(input.toFile(), FormInput.class);
-            GenerationResult result = new GenerationService(config, new InMemoryCacheSupply())
+            GenerationResult result = new GenerationService(config, new SqliteCacheSupply(dictStore))
                     .generate(form);
             json.writeValue(output.toFile(), result);
             System.out.println("生成成功: 表 " + result.tableName + "，字段 " + result.fields.size()

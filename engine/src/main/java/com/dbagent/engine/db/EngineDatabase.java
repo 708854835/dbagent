@@ -43,6 +43,7 @@ public final class EngineDatabase {
              Statement stmt = conn.createStatement()) {
             stmt.execute("PRAGMA journal_mode=WAL");
             stmt.execute(CONFIRMED_CANDIDATE_DDL);
+            stmt.execute(DictStore.DDL);
         } catch (SQLException e) {
             throw new IllegalStateException("SQLite 初始化失败: " + db, e);
         }
