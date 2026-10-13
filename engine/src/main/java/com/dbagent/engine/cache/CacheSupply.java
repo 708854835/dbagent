@@ -4,15 +4,17 @@ import java.util.List;
 
 /**
  * 缓存供给缝：决策链经此接口读本系统 Schema 缓存 / 字典快照。
- * 本系统 Schema 缓存随后在复用工单接入；字典快照经 SQLite 供给（全局一份）。
+ * Schema 缓存按"系统"维度隔离；字典快照全局一份（SQLite 供给）。
  */
 public interface CacheSupply {
 
     /**
-     * 本系统 Schema 缓存：按录入中文名与存量字段 COMMENT 中文名精确匹配。
+     * 本系统 Schema 缓存：按录入中文名与存量字段 COMMENT 中文名精确匹配
+     * （精确等于或忽略首尾空白，不做分词/相似度）。
+     * owningSystem 为空时返回空（CLI 无系统上下文场景跳过复用级）。
      * 命中多条且定义不一致时返回全部候选，由决策链标"需人工复核"。
      */
-    List<CachedField> findSchemaFields(String chineseName);
+    List<CachedField> findSchemaFields(String owningSystem, String chineseName);
 
     /** 字典快照：按中文名查字典项（公共集/自治级）。 */
     List<DictItem> findDictItems(String chineseName);

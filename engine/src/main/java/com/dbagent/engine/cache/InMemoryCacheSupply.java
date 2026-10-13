@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 内存 fake 缓存供给：T1 切片默认全空（全部走推导路径）；
+ * 内存 fake 缓存供给：默认全空（全部走推导/贯标路径）；
  * 测试可预置条目以验证复用/贯标缝。
  */
 public final class InMemoryCacheSupply implements CacheSupply {
@@ -14,8 +14,9 @@ public final class InMemoryCacheSupply implements CacheSupply {
     private final Map<String, List<CachedField>> schemaFields = new HashMap<>();
     private final Map<String, List<DictItem>> dictItems = new HashMap<>();
 
-    public InMemoryCacheSupply putSchemaField(CachedField field) {
-        schemaFields.computeIfAbsent(field.chineseName(), k -> new ArrayList<>()).add(field);
+    public InMemoryCacheSupply putSchemaField(String owningSystem, CachedField field) {
+        schemaFields.computeIfAbsent(key(owningSystem, field.chineseName()),
+                k -> new ArrayList<>()).add(field);
         return this;
     }
 
@@ -25,12 +26,20 @@ public final class InMemoryCacheSupply implements CacheSupply {
     }
 
     @Override
-    public List<CachedField> findSchemaFields(String chineseName) {
-        return schemaFields.getOrDefault(chineseName, List.of());
+    public List<CachedField> findSchemaFields(String owningSystem, String chineseName) {
+        if (owningSystem == null || owningSystem.isBlank()) {
+            return List.of();
+        }
+        return schemaFields.getOrDefault(key(owningSystem, chineseName), List.of());
     }
 
     @Override
     public List<DictItem> findDictItems(String chineseName) {
         return dictItems.getOrDefault(chineseName, List.of());
+    }
+
+    private static String key(String owningSystem, String chineseName) {
+        // 精确匹配（忽略首尾空白，不做分词/相似度）
+        return owningSystem + "\u0001" + chineseName.trim();
     }
 }

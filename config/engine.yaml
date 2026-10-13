@@ -1,0 +1,11 @@
+http:
+  port: 9090
+
+# Token → 用户上下文（notesId / 本系统标识）。HTTP 登录态校验用，CLI 免 Token。
+tokens:
+  demo-token-zhangsan:
+    notesId: zhangsan
+    owningSystem: loan-system
+  demo-token-lisi:
+    notesId: lisi
+    owningSystem: deposit-system

@@ -43,13 +43,19 @@ public final class GenerationService {
         // 字段三级决策
         List<FieldDecision> decisions = new ArrayList<>();
         for (FormField f : form.fields) {
-            decisions.add(decisionChain.decide(f));
+            decisions.add(decisionChain.decide(f, form.owningSystem));
         }
         for (FieldDecision d : decisions) {
             if (!d.isUsable()) {
                 warnings.add("字段「" + d.chineseName() + "」需人工复核: " + d.note()
                         + "（修正前不进入 DDL）");
             }
+        }
+        // 复用比例高时提示：可结合上下文微调而非逐字段选择
+        long reuseCount = decisions.stream().filter(d -> d.badge() == Badge.REUSE).count();
+        if (!decisions.isEmpty() && reuseCount * 100 / decisions.size() > 80) {
+            warnings.add("复用字段比例 " + reuseCount + "/" + decisions.size()
+                    + "（>80%），建议结合上下文微调而非逐字段选择");
         }
 
         // 主键：用户勾选优先，否则自动补齐自增 id
@@ -128,6 +134,7 @@ public final class GenerationService {
             view.badge = d.badge().display();
             view.note = d.note();
             view.codeList = d.codeList();
+            view.candidates = d.candidates();
             result.fields.add(view);
 
             if (d.badge() == Badge.DERIVED) {

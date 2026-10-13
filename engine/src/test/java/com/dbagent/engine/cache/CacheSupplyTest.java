@@ -19,6 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class CacheSupplyTest {
 
+    private static final String SYSTEM = "loan-system";
+
     private final EngineConfig config = RulesLoader.load(Path.of("../config"));
 
     @Test
@@ -27,7 +29,7 @@ class CacheSupplyTest {
         FormField field = new FormField();
         field.chineseName = "合同编号";
 
-        FieldDecision d = chain.decide(field);
+        FieldDecision d = chain.decide(field, SYSTEM);
         assertEquals(Badge.DERIVED, d.badge());
         assertEquals("contract_no", d.englishName());
         assertEquals("编码类", d.dataType());
@@ -37,14 +39,15 @@ class CacheSupplyTest {
     void schemaCacheHitAdoptsExistingDefinitionAndIgnoresUserLength() {
         // 预置存量字段：VARCHAR(64)，用户手填 length=32 应被忽略（ADR-0001 照抄存量）
         InMemoryCacheSupply cache = new InMemoryCacheSupply()
-                .putSchemaField(new CacheSupply.CachedField("合同编号", "contract_no", "VARCHAR(64)"));
+                .putSchemaField(SYSTEM,
+                        new CacheSupply.CachedField("合同编号", "contract_no", "VARCHAR(64)"));
         DecisionChain chain = newChain(cache);
 
         FormField field = new FormField();
         field.chineseName = "合同编号";
         field.length = 32;
 
-        FieldDecision d = chain.decide(field);
+        FieldDecision d = chain.decide(field, SYSTEM);
         assertEquals(Badge.REUSE, d.badge());
         assertEquals("contract_no", d.englishName());
         assertEquals("VARCHAR(64)", d.physicalType());
@@ -61,24 +64,25 @@ class CacheSupplyTest {
         FormField field = new FormField();
         field.chineseName = "借款金额";
 
-        FieldDecision d = chain.decide(field);
+        FieldDecision d = chain.decide(field, SYSTEM);
         assertEquals(Badge.STANDARDIZED, d.badge());
         assertEquals("loan_amt", d.englishName());
         assertEquals("DECIMAL(18,2)", d.physicalType());
     }
 
     @Test
-    void conflictingSchemaHitsAreMarkedForReview() {
+    void conflictingSchemaHitsAreMarkedForReviewWithCandidates() {
         InMemoryCacheSupply cache = new InMemoryCacheSupply()
-                .putSchemaField(new CacheSupply.CachedField("备注", "remark", "VARCHAR(128)"))
-                .putSchemaField(new CacheSupply.CachedField("备注", "memo", "VARCHAR(256)"));
+                .putSchemaField(SYSTEM, new CacheSupply.CachedField("备注", "remark", "VARCHAR(128)"))
+                .putSchemaField(SYSTEM, new CacheSupply.CachedField("备注", "memo", "VARCHAR(256)"));
         DecisionChain chain = newChain(cache);
 
         FormField field = new FormField();
         field.chineseName = "备注";
 
-        FieldDecision d = chain.decide(field);
+        FieldDecision d = chain.decide(field, SYSTEM);
         assertEquals(Badge.NEEDS_REVIEW, d.badge());
+        assertEquals(2, d.candidates().size());
     }
 
     private DecisionChain newChain(CacheSupply cache) {

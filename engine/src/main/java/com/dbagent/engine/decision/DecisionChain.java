@@ -9,14 +9,16 @@ import com.dbagent.engine.rules.TypeMappingRules;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * 三级决策骨架：本系统复用 → 字典贯标 → 缩写词典推导。
- * 复用级在复用工单完整落地；词典未覆盖词转 LLM 辅助在 LLM 工单接入，本切片标"需人工复核"占位。
+ * 三级决策链：本系统复用 → 字典贯标 → 缩写词典推导。
+ * 词典未覆盖词转 LLM 辅助在 LLM 工单接入，本切片标"需人工复核"占位。
  */
 public final class DecisionChain {
 
@@ -36,25 +38,29 @@ public final class DecisionChain {
         this.naming = naming;
     }
 
-    public FieldDecision decide(FormField field) {
+    /**
+     * @param owningSystem 本系统标识（复用缓存按系统隔离）；为空时跳过复用级
+     */
+    public FieldDecision decide(FormField field, String owningSystem) {
         String chineseName = field.chineseName.trim();
 
-        // ① 本系统复用：精确匹配存量字段 COMMENT 中文名（复用工单完整落地候选/冲突处理）
-        List<CacheSupply.CachedField> hits = cacheSupply.findSchemaFields(chineseName);
-        if (hits.size() == 1) {
-            CacheSupply.CachedField hit = hits.get(0);
-            // ADR-0001：照抄存量英文名与类型，忽略手填长度/精度
-            return FieldDecision.reuse(chineseName, hit.englishName(), hit.physicalType());
-        }
-        if (hits.size() > 1) {
-            boolean identical = hits.stream().allMatch(h ->
-                    h.englishName().equals(hits.get(0).englishName())
-                            && h.physicalType().equals(hits.get(0).physicalType()));
-            if (identical) {
-                CacheSupply.CachedField hit = hits.get(0);
-                return FieldDecision.reuse(chineseName, hit.englishName(), hit.physicalType());
+        // ① 本系统复用：录入中文名与存量字段 COMMENT 中文名精确匹配（忽略首尾空白，不做分词）
+        List<CacheSupply.CachedField> hits = cacheSupply.findSchemaFields(owningSystem, chineseName);
+        if (!hits.isEmpty()) {
+            // 按 英文名+物理类型 去重：定义一致 → 采用；不一致 → 全量列候选
+            Map<String, CacheSupply.CachedField> distinct = new LinkedHashMap<>();
+            for (CacheSupply.CachedField h : hits) {
+                distinct.putIfAbsent(h.englishName() + "\u0001" + h.physicalType(), h);
             }
-            return FieldDecision.needsReview(chineseName, "复用命中多个定义不一致的存量字段，请人工选择");
+            if (distinct.size() == 1) {
+                // ADR-0001：照抄存量英文名与类型（输出统一小写），忽略手填长度/精度、不读类型映射
+                CacheSupply.CachedField hit = distinct.values().iterator().next();
+                return FieldDecision.reuse(chineseName,
+                        hit.englishName().toLowerCase(Locale.ROOT), hit.physicalType());
+            }
+            return FieldDecision.needsReview(chineseName,
+                    "复用命中 " + distinct.size() + " 个定义不一致的存量字段，请人工选择",
+                    List.copyOf(distinct.values()));
         }
 
         // ② 字典贯标：公共集优先于自治级；存量公共集兼容采用（选词结构照抄，输出统一小写）

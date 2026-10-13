@@ -1,0 +1,16 @@
+# T3 验收演示：本系统 Schema 缓存拉取（docker 环境）
+# 用法：
+#   docker compose -f docker/demo/docker-compose.yml up -d
+#   java -jar engine/build/libs/engine.jar refresh-schema \
+#     --system loan-system --jdbc jdbc:mysql://localhost:3306/loandb --user root --password root
+#   → 预期输出 "共 100 个字段"
+# 然后 HTTP/CLI 生成含"客户编号/客户名称/备注"的表单验证复用决策级。
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro

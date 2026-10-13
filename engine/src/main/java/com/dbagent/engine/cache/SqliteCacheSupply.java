@@ -1,24 +1,30 @@
 package com.dbagent.engine.cache;
 
+import com.dbagent.engine.db.CacheStore;
 import com.dbagent.engine.db.DictStore;
 
 import java.util.List;
 
 /**
- * SQLite 缓存供给：字典快照经 DictStore 读取（全局一份）；
- * 本系统 Schema 缓存随后续复用工单接入（本实现暂返回空）。
+ * SQLite 缓存供给：Schema 缓存按系统隔离（CacheStore），字典快照全局一份（DictStore）。
+ * 生成完全离线读缓存。
  */
 public final class SqliteCacheSupply implements CacheSupply {
 
     private final DictStore dictStore;
+    private final CacheStore cacheStore;
 
-    public SqliteCacheSupply(DictStore dictStore) {
+    public SqliteCacheSupply(DictStore dictStore, CacheStore cacheStore) {
         this.dictStore = dictStore;
+        this.cacheStore = cacheStore;
     }
 
     @Override
-    public List<CachedField> findSchemaFields(String chineseName) {
-        return List.of();
+    public List<CachedField> findSchemaFields(String owningSystem, String chineseName) {
+        if (owningSystem == null || owningSystem.isBlank()) {
+            return List.of();
+        }
+        return cacheStore.findByComment(owningSystem, chineseName);
     }
 
     @Override
